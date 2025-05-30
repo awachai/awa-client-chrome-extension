@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -276,15 +277,15 @@ const ChatPage = () => {
                   <p className="text-sm">{message.content}</p>
                   {message.attachments && message.attachments.length > 0 && (
                     <div className="mt-3">
-                      {/* Images in grid layout (2 columns) */}
+                      {/* Images with fixed size */}
                       {message.attachments.filter(att => att.type === 'image').length > 0 && (
-                        <div className="grid grid-cols-2 gap-2 mb-3">
+                        <div className="flex flex-wrap gap-2 mb-3">
                           {message.attachments
                             .filter(att => att.type === 'image')
                             .map((attachment, index) => (
                               <div key={index} className="relative group">
                                 <div 
-                                  className="cursor-pointer"
+                                  className="cursor-pointer w-20 h-20"
                                   onClick={() => {
                                     console.log('Image clicked:', attachment);
                                     handleViewFile(attachment);
@@ -293,13 +294,13 @@ const ChatPage = () => {
                                   <img 
                                     src={attachment.url} 
                                     alt={attachment.name}
-                                    className="w-full h-24 object-cover rounded-lg hover:opacity-90 transition-opacity"
+                                    className="w-20 h-20 object-cover rounded-lg hover:opacity-90 transition-opacity"
                                   />
                                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
-                                    <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                                   </div>
                                 </div>
-                                <p className="text-xs mt-1 opacity-75 truncate">{attachment.name}</p>
+                                <p className="text-xs mt-1 opacity-75 truncate w-20">{attachment.name}</p>
                               </div>
                             ))}
                         </div>
