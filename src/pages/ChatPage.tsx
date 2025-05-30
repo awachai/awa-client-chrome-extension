@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -153,18 +154,24 @@ const ChatPage = () => {
             className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div className={`flex space-x-3 max-w-3xl ${message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-              <div className="flex-shrink-0">
+              <div className="flex-shrink-0 flex flex-col items-center">
                 {message.type === 'user' ? (
-                  <Avatar className="w-8 h-8">
-                    <AvatarImage src={mockUser.avatar || undefined} />
-                    <AvatarFallback className="bg-blue-600 text-white text-xs">
-                      {getUserInitials(mockUser.name)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <>
+                    <Avatar className="w-8 h-8">
+                      <AvatarImage src={mockUser.avatar || undefined} />
+                      <AvatarFallback className="bg-blue-600 text-white text-xs">
+                        {getUserInitials(mockUser.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-xs text-gray-500 mt-1 text-center">{mockUser.name}</span>
+                  </>
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
-                    <Bot className="h-4 w-4 text-white" />
-                  </div>
+                  <>
+                    <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
+                      <Bot className="h-4 w-4 text-white" />
+                    </div>
+                    <span className="text-xs text-gray-500 mt-1 text-center">AI Agent</span>
+                  </>
                 )}
               </div>
               <Card className={`${message.type === 'user' ? 'bg-blue-600 text-white' : 'bg-white'}`}>
@@ -185,8 +192,11 @@ const ChatPage = () => {
         {isLoading && (
           <div className="flex justify-start">
             <div className="flex space-x-3 max-w-3xl">
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
-                <Bot className="h-4 w-4 text-white" />
+              <div className="flex-shrink-0 flex flex-col items-center">
+                <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
+                  <Bot className="h-4 w-4 text-white" />
+                </div>
+                <span className="text-xs text-gray-500 mt-1 text-center">AI Agent</span>
               </div>
               <Card className="bg-white">
                 <CardContent className="p-3">
