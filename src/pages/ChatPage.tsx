@@ -134,7 +134,7 @@ const ChatPage = () => {
             <Avatar className="h-8 w-8">
               <AvatarImage src={mockUser.avatar || undefined} />
               <AvatarFallback className="bg-blue-100 text-blue-600 text-sm font-medium">
-                {getUserInitials(mockUser.name)}
+                <User className="h-4 w-4" />
               </AvatarFallback>
             </Avatar>
             <span className="text-sm font-medium text-gray-700">{mockUser.name}</span>
@@ -160,7 +160,7 @@ const ChatPage = () => {
                     <Avatar className="w-8 h-8">
                       <AvatarImage src={mockUser.avatar || undefined} />
                       <AvatarFallback className="bg-blue-600 text-white text-xs">
-                        {getUserInitials(mockUser.name)}
+                        <User className="h-4 w-4" />
                       </AvatarFallback>
                     </Avatar>
                     <span className="text-xs text-gray-500 mt-1 text-center">{mockUser.name}</span>
