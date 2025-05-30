@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -242,36 +243,49 @@ const ChatPage = () => {
                 <CardContent className="p-3">
                   <p className="text-sm">{message.content}</p>
                   {message.attachments && message.attachments.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                      {message.attachments.map((attachment, index) => (
-                        <div key={index}>
-                          {attachment.type === 'image' ? (
-                            <div className="relative group">
-                              <img 
-                                src={attachment.url} 
-                                alt={attachment.name}
-                                className="max-w-64 max-h-48 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                                onClick={() => handleViewFile(attachment)}
-                              />
-                              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
-                                <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="mt-3">
+                      {/* Images in grid layout (2 columns) */}
+                      {message.attachments.filter(att => att.type === 'image').length > 0 && (
+                        <div className="grid grid-cols-2 gap-2 mb-3">
+                          {message.attachments
+                            .filter(att => att.type === 'image')
+                            .map((attachment, index) => (
+                              <div key={index} className="relative group">
+                                <img 
+                                  src={attachment.url} 
+                                  alt={attachment.name}
+                                  className="w-full h-32 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                                  onClick={() => handleViewFile(attachment)}
+                                />
+                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
+                                  <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                                <p className="text-xs mt-1 opacity-75 truncate">{attachment.name}</p>
                               </div>
-                              <p className="text-xs mt-1 opacity-75">{attachment.name}</p>
-                            </div>
-                          ) : (
-                            <div 
-                              className={`flex items-center space-x-2 p-2 rounded border cursor-pointer hover:bg-opacity-80 transition-colors ${
-                                message.type === 'user' ? 'bg-blue-500 border-blue-400' : 'bg-gray-50 border-gray-200'
-                              }`}
-                              onClick={() => handleViewFile(attachment)}
-                            >
-                              <FileText className="h-4 w-4" />
-                              <span className="text-xs flex-1 truncate">{attachment.name}</span>
-                              <Download className="h-3 w-3 opacity-60" />
-                            </div>
-                          )}
+                            ))}
                         </div>
-                      ))}
+                      )}
+                      
+                      {/* Files (non-images) */}
+                      {message.attachments.filter(att => att.type === 'file').length > 0 && (
+                        <div className="space-y-2">
+                          {message.attachments
+                            .filter(att => att.type === 'file')
+                            .map((attachment, index) => (
+                              <div 
+                                key={index}
+                                className={`flex items-center space-x-2 p-2 rounded border cursor-pointer hover:bg-opacity-80 transition-colors ${
+                                  message.type === 'user' ? 'bg-blue-500 border-blue-400' : 'bg-gray-50 border-gray-200'
+                                }`}
+                                onClick={() => handleViewFile(attachment)}
+                              >
+                                <FileText className="h-4 w-4" />
+                                <span className="text-xs flex-1 truncate">{attachment.name}</span>
+                                <Download className="h-3 w-3 opacity-60" />
+                              </div>
+                            ))}
+                        </div>
+                      )}
                     </div>
                   )}
                   <p className={`text-xs mt-1 ${message.type === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
@@ -314,7 +328,7 @@ const ChatPage = () => {
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-sm font-medium text-gray-700">ไฟล์ที่เลือก ({pendingFiles.length})</h4>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {pendingFiles.map((pendingFile, index) => (
                   <div key={index} className="relative group">
                     <div className="flex items-center space-x-2 bg-white p-2 rounded border">
@@ -331,12 +345,12 @@ const ChatPage = () => {
                       ) : (
                         <FileText className="h-4 w-4 text-gray-500" />
                       )}
-                      <span className="text-xs text-gray-700 max-w-20 truncate">
+                      <span className="text-xs text-gray-700 flex-1 truncate">
                         {pendingFile.file.name}
                       </span>
                       <button
                         onClick={() => removePendingFile(index)}
-                        className="text-red-500 hover:text-red-700"
+                        className="text-red-500 hover:text-red-700 flex-shrink-0"
                       >
                         <X className="h-3 w-3" />
                       </button>
