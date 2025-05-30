@@ -14,7 +14,7 @@ const Index = () => {
           <div className="flex justify-center">
             <Bot className="h-16 w-16 text-blue-600" />
           </div>
-          <h1 className="text-4xl font-bold text-gray-900">AI Web Agent</h1>
+          <h1 className="text-4xl font-bold text-gray-900 font-kanit">AI Web Agent</h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             ตัวช่วย AI ที่ช่วยควบคุมและทำงานกับบราวเซอร์ของคุณอย่างอัตโนมัติ
           </p>
@@ -24,7 +24,7 @@ const Index = () => {
           <Card>
             <CardHeader>
               <Zap className="h-8 w-8 text-blue-600 mb-2" />
-              <CardTitle>ควบคุมอัตโนมัติ</CardTitle>
+              <CardTitle className="font-kanit">ควบคุมอัตโนมัติ</CardTitle>
             </CardHeader>
             <CardContent>
               <CardDescription>
@@ -36,7 +36,7 @@ const Index = () => {
           <Card>
             <CardHeader>
               <Bot className="h-8 w-8 text-green-600 mb-2" />
-              <CardTitle>AI Assistant</CardTitle>
+              <CardTitle className="font-kanit">AI Assistant</CardTitle>
             </CardHeader>
             <CardContent>
               <CardDescription>
@@ -48,7 +48,7 @@ const Index = () => {
           <Card>
             <CardHeader>
               <Shield className="h-8 w-8 text-purple-600 mb-2" />
-              <CardTitle>ปลอดภัย</CardTitle>
+              <CardTitle className="font-kanit">ปลอดภัย</CardTitle>
             </CardHeader>
             <CardContent>
               <CardDescription>
@@ -62,7 +62,7 @@ const Index = () => {
           <Button 
             onClick={() => navigate('/login')} 
             size="lg"
-            className="px-8 py-3 text-lg"
+            className="px-8 py-3 text-lg font-kanit"
           >
             เริ่มใช้งาน
           </Button>

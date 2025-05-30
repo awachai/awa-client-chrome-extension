@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -74,7 +73,7 @@ const ChatPage = () => {
       <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <Bot className="h-8 w-8 text-blue-600" />
-          <h1 className="text-xl font-semibold">AI Web Agent</h1>
+          <h1 className="text-xl font-semibold font-kanit">AI Web Agent</h1>
         </div>
         <Button variant="ghost" onClick={handleLogout}>
           <LogOut className="h-4 w-4 mr-2" />

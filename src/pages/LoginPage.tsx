@@ -43,7 +43,7 @@ const LoginPage = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-4">
           <Bot className="h-12 w-12 text-blue-600 mx-auto" />
-          <CardTitle className="text-2xl">เข้าสู่ระบบ</CardTitle>
+          <CardTitle className="text-2xl font-kanit">เข้าสู่ระบบ</CardTitle>
           <CardDescription>
             กรุณาเข้าสู่ระบบเพื่อใช้งาน AI Web Agent
           </CardDescription>
@@ -82,7 +82,7 @@ const LoginPage = () => {
             </div>
             <Button 
               type="submit" 
-              className="w-full" 
+              className="w-full font-kanit" 
               disabled={isLoading}
             >
               {isLoading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
