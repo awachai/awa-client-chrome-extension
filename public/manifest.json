@@ -6,17 +6,14 @@
   "description": "Chrome extension helper for Thai language learning and translation",
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "sidePanel"
   ],
   "action": {
-    "default_popup": "index.html",
-    "default_title": "Thai Helper",
-    "default_icon": {
-      "16": "favicon.ico",
-      "32": "favicon.ico",
-      "48": "favicon.ico",
-      "128": "favicon.ico"
-    }
+    "default_title": "Thai Helper"
+  },
+  "side_panel": {
+    "default_path": "index.html"
   },
   "icons": {
     "16": "favicon.ico",
