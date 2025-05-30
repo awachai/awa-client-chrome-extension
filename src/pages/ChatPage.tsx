@@ -1,11 +1,10 @@
-
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Bot, User, Send, Paperclip, Image, FileText, LogOut } from "lucide-react";
+import { Bot, User, Send, Paperclip, Image, FileText, LogOut, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface Message {
@@ -14,6 +13,12 @@ interface Message {
   content: string;
   timestamp: Date;
   attachments?: { type: 'image' | 'file'; name: string; url: string }[];
+}
+
+interface PendingFile {
+  file: File;
+  type: 'image' | 'file';
+  preview?: string;
 }
 
 // Mock user data - in real app this would come from authentication
@@ -35,6 +40,7 @@ const ChatPage = () => {
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -43,18 +49,42 @@ const ChatPage = () => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
+  // Helper function to determine file type
+  const getFileType = (file: File): 'image' | 'file' => {
+    return file.type.startsWith('image/') ? 'image' : 'file';
+  };
+
+  // Helper function to create file preview
+  const createFilePreview = (file: File): Promise<string | undefined> => {
+    return new Promise((resolve) => {
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.readAsDataURL(file);
+      } else {
+        resolve(undefined);
+      }
+    });
+  };
+
   const handleSendMessage = () => {
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim() && pendingFiles.length === 0) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       type: 'user',
-      content: inputMessage,
+      content: inputMessage || (pendingFiles.length > 0 ? `ส่งไฟล์ ${pendingFiles.length} ไฟล์` : ''),
       timestamp: new Date(),
+      attachments: pendingFiles.map(pf => ({
+        type: pf.type,
+        name: pf.file.name,
+        url: pf.preview || ''
+      }))
     };
 
     setMessages(prev => [...prev, userMessage]);
     setInputMessage("");
+    setPendingFiles([]);
     setIsLoading(true);
 
     // Simulate AI response
@@ -62,7 +92,7 @@ const ChatPage = () => {
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'ai',
-        content: `ได้รับคำสั่ง: "${inputMessage}" กำลังดำเนินการ... ผมจะช่วยคุณทำงานนี้ในบราวเซอร์`,
+        content: `ได้รับคำสั่ง: "${inputMessage}" ${pendingFiles.length > 0 ? `และไฟล์ ${pendingFiles.length} ไฟล์` : ''} กำลังดำเนินการ... ผมจะช่วยคุณทำงานนี้ในบราวเซอร์`,
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, aiMessage]);
@@ -70,14 +100,29 @@ const ChatPage = () => {
     }, 1500);
   };
 
-  const handleFileUpload = (files: FileList | null) => {
+  const handleFileUpload = async (files: FileList | null) => {
     if (files) {
       console.log('Files selected:', files);
-      // Handle file upload logic here
-      Array.from(files).forEach(file => {
+      const newPendingFiles: PendingFile[] = [];
+      
+      for (const file of Array.from(files)) {
         console.log(`File: ${file.name}, Size: ${file.size}, Type: ${file.type}`);
-      });
+        const fileType = getFileType(file);
+        const preview = await createFilePreview(file);
+        
+        newPendingFiles.push({
+          file,
+          type: fileType,
+          preview
+        });
+      }
+      
+      setPendingFiles(prev => [...prev, ...newPendingFiles]);
     }
+  };
+
+  const removePendingFile = (index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -177,6 +222,20 @@ const ChatPage = () => {
               <Card className={`${message.type === 'user' ? 'bg-blue-600 text-white' : 'bg-white'}`}>
                 <CardContent className="p-3">
                   <p className="text-sm">{message.content}</p>
+                  {message.attachments && message.attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {message.attachments.map((attachment, index) => (
+                        <div key={index} className="flex items-center space-x-1 text-xs">
+                          {attachment.type === 'image' ? (
+                            <Image className="h-3 w-3" />
+                          ) : (
+                            <FileText className="h-3 w-3" />
+                          )}
+                          <span>{attachment.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <p className={`text-xs mt-1 ${message.type === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
                     {message.timestamp.toLocaleTimeString('th-TH', { 
                       hour: '2-digit', 
@@ -211,6 +270,45 @@ const ChatPage = () => {
       {/* Input Area */}
       <div className="bg-white border-t p-6">
         <div className="max-w-4xl mx-auto">
+          {/* Pending Files Preview */}
+          {pendingFiles.length > 0 && (
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-medium text-gray-700">ไฟล์ที่เลือก ({pendingFiles.length})</h4>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {pendingFiles.map((pendingFile, index) => (
+                  <div key={index} className="relative group">
+                    <div className="flex items-center space-x-2 bg-white p-2 rounded border">
+                      {pendingFile.type === 'image' ? (
+                        pendingFile.preview ? (
+                          <img 
+                            src={pendingFile.preview} 
+                            alt={pendingFile.file.name}
+                            className="w-8 h-8 object-cover rounded"
+                          />
+                        ) : (
+                          <Image className="h-4 w-4 text-blue-500" />
+                        )
+                      ) : (
+                        <FileText className="h-4 w-4 text-gray-500" />
+                      )}
+                      <span className="text-xs text-gray-700 max-w-20 truncate">
+                        {pendingFile.file.name}
+                      </span>
+                      <button
+                        onClick={() => removePendingFile(index)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="flex space-x-3">
             <div className="flex-1">
               <Textarea
@@ -236,7 +334,7 @@ const ChatPage = () => {
               </Button>
               <Button
                 onClick={handleSendMessage}
-                disabled={!inputMessage.trim() || isLoading}
+                disabled={(!inputMessage.trim() && pendingFiles.length === 0) || isLoading}
                 size="icon"
               >
                 <Send className="h-4 w-4" />
