@@ -1,9 +1,9 @@
-
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Bot, User, Send, Paperclip, Image, FileText, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -14,6 +14,13 @@ interface Message {
   timestamp: Date;
   attachments?: { type: 'image' | 'file'; name: string; url: string }[];
 }
+
+// Mock user data - in real app this would come from authentication
+const mockUser = {
+  name: "สมชาย ใจดี",
+  email: "somchai@example.com",
+  avatar: null // No avatar image for now
+};
 
 const ChatPage = () => {
   const [messages, setMessages] = useState<Message[]>([
@@ -29,6 +36,11 @@ const ChatPage = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+
+  // Helper function to get user initials
+  const getUserInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase();
+  };
 
   const handleSendMessage = () => {
     if (!inputMessage.trim()) return;
@@ -116,10 +128,21 @@ const ChatPage = () => {
           <Bot className="h-8 w-8 text-blue-600" />
           <h1 className="text-xl font-semibold font-kanit">AI Web Agent</h1>
         </div>
-        <Button variant="ghost" onClick={handleLogout}>
-          <LogOut className="h-4 w-4 mr-2" />
-          ออกจากระบบ
-        </Button>
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
+            <Avatar className="h-8 w-8">
+              <AvatarImage src={mockUser.avatar || undefined} />
+              <AvatarFallback className="bg-blue-100 text-blue-600 text-sm font-medium">
+                {getUserInitials(mockUser.name)}
+              </AvatarFallback>
+            </Avatar>
+            <span className="text-sm font-medium text-gray-700">{mockUser.name}</span>
+          </div>
+          <Button variant="ghost" onClick={handleLogout}>
+            <LogOut className="h-4 w-4 mr-2" />
+            ออกจากระบบ
+          </Button>
+        </div>
       </div>
 
       {/* Chat Messages */}
@@ -130,13 +153,18 @@ const ChatPage = () => {
             className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div className={`flex space-x-3 max-w-3xl ${message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-              <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                message.type === 'user' ? 'bg-blue-600' : 'bg-gray-600'
-              }`}>
+              <div className="flex-shrink-0">
                 {message.type === 'user' ? (
-                  <User className="h-4 w-4 text-white" />
+                  <Avatar className="w-8 h-8">
+                    <AvatarImage src={mockUser.avatar || undefined} />
+                    <AvatarFallback className="bg-blue-600 text-white text-xs">
+                      {getUserInitials(mockUser.name)}
+                    </AvatarFallback>
+                  </Avatar>
                 ) : (
-                  <Bot className="h-4 w-4 text-white" />
+                  <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
+                    <Bot className="h-4 w-4 text-white" />
+                  </div>
                 )}
               </div>
               <Card className={`${message.type === 'user' ? 'bg-blue-600 text-white' : 'bg-white'}`}>
