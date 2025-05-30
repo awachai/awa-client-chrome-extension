@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Bot, User, Send, Paperclip, Image, FileText, LogOut, X } from "lucide-react";
+import { Bot, User, Send, Paperclip, Image, FileText, LogOut, X, Download, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface Message {
@@ -70,16 +70,19 @@ const ChatPage = () => {
   const handleSendMessage = () => {
     if (!inputMessage.trim() && pendingFiles.length === 0) return;
 
+    // Create blob URLs for file attachments to make them viewable
+    const attachments = pendingFiles.map(pf => ({
+      type: pf.type,
+      name: pf.file.name,
+      url: URL.createObjectURL(pf.file) // Create blob URL for viewing
+    }));
+
     const userMessage: Message = {
       id: Date.now().toString(),
       type: 'user',
       content: inputMessage || (pendingFiles.length > 0 ? `ส่งไฟล์ ${pendingFiles.length} ไฟล์` : ''),
       timestamp: new Date(),
-      attachments: pendingFiles.map(pf => ({
-        type: pf.type,
-        name: pf.file.name,
-        url: pf.preview || ''
-      }))
+      attachments
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -92,7 +95,7 @@ const ChatPage = () => {
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'ai',
-        content: `ได้รับคำสั่ง: "${inputMessage}" ${pendingFiles.length > 0 ? `และไฟล์ ${pendingFiles.length} ไฟล์` : ''} กำลังดำเนินการ... ผมจะช่วยคุณทำงานนี้ในบราวเซอร์`,
+        content: `ได้รับคำสั่ง: "${inputMessage}" ${attachments.length > 0 ? `และไฟล์ ${attachments.length} ไฟล์` : ''} กำลังดำเนินการ... ผมจะช่วยคุณทำงานนี้ในบราวเซอร์`,
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, aiMessage]);
@@ -148,6 +151,22 @@ const ChatPage = () => {
 
   const handleLogout = () => {
     navigate('/login');
+  };
+
+  // Helper function to handle file viewing
+  const handleViewFile = (attachment: { type: 'image' | 'file'; name: string; url: string }) => {
+    if (attachment.type === 'image') {
+      // For images, open in new tab
+      window.open(attachment.url, '_blank');
+    } else {
+      // For other files, download them
+      const link = document.createElement('a');
+      link.href = attachment.url;
+      link.download = attachment.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   return (
@@ -223,15 +242,34 @@ const ChatPage = () => {
                 <CardContent className="p-3">
                   <p className="text-sm">{message.content}</p>
                   {message.attachments && message.attachments.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
+                    <div className="mt-3 space-y-2">
                       {message.attachments.map((attachment, index) => (
-                        <div key={index} className="flex items-center space-x-1 text-xs">
+                        <div key={index}>
                           {attachment.type === 'image' ? (
-                            <Image className="h-3 w-3" />
+                            <div className="relative group">
+                              <img 
+                                src={attachment.url} 
+                                alt={attachment.name}
+                                className="max-w-64 max-h-48 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                                onClick={() => handleViewFile(attachment)}
+                              />
+                              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
+                                <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </div>
+                              <p className="text-xs mt-1 opacity-75">{attachment.name}</p>
+                            </div>
                           ) : (
-                            <FileText className="h-3 w-3" />
+                            <div 
+                              className={`flex items-center space-x-2 p-2 rounded border cursor-pointer hover:bg-opacity-80 transition-colors ${
+                                message.type === 'user' ? 'bg-blue-500 border-blue-400' : 'bg-gray-50 border-gray-200'
+                              }`}
+                              onClick={() => handleViewFile(attachment)}
+                            >
+                              <FileText className="h-4 w-4" />
+                              <span className="text-xs flex-1 truncate">{attachment.name}</span>
+                              <Download className="h-3 w-3 opacity-60" />
+                            </div>
                           )}
-                          <span>{attachment.name}</span>
                         </div>
                       ))}
                     </div>
