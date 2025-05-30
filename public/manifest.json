@@ -1,7 +1,7 @@
 
 {
   "manifest_version": 3,
-  "name": "Chrome Thai Helper",
+  "name": "AI Web Agent",
   "version": "1.0.0",
   "description": "Chrome extension helper for Thai language learning and translation",
   "permissions": [
