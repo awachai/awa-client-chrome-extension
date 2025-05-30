@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -181,7 +180,7 @@ const ChatPage = () => {
 
   return (
     <div 
-      className="min-h-screen bg-gray-50 flex flex-col"
+      className="h-screen bg-gray-50 flex flex-col max-w-full"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -189,21 +188,21 @@ const ChatPage = () => {
       {/* Image Modal */}
       {selectedImage && (
         <Dialog open={true} onOpenChange={closeImageModal}>
-          <DialogContent className="max-w-4xl w-full p-0 border-0">
+          <DialogContent className="max-w-sm w-full p-0 border-0">
             <div className="relative bg-black rounded-lg overflow-hidden">
               <img 
                 src={selectedImage.url} 
                 alt={selectedImage.name}
-                className="w-full h-auto max-h-[80vh] object-contain"
+                className="w-full h-auto max-h-[60vh] object-contain"
               />
               <button
                 onClick={closeImageModal}
-                className="absolute top-4 right-4 bg-black/70 hover:bg-black/90 text-white rounded-full p-2 transition-colors z-10"
+                className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white rounded-full p-1 transition-colors z-10"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3 w-3" />
               </button>
-              <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white p-4">
-                <p className="text-sm font-medium">{selectedImage.name}</p>
+              <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white p-2">
+                <p className="text-xs font-medium truncate">{selectedImage.name}</p>
               </div>
             </div>
           </DialogContent>
@@ -212,80 +211,70 @@ const ChatPage = () => {
 
       {/* Drag overlay */}
       {isDragOver && (
-        <div className="fixed inset-0 bg-blue-500/20 border-4 border-dashed border-blue-500 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-8 shadow-xl text-center">
-            <FileText className="h-16 w-16 text-blue-500 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2 font-kanit">วางไฟล์ที่นี่</h3>
-            <p className="text-gray-600">รองรับรูปภาพและเอกสาร</p>
+        <div className="fixed inset-0 bg-blue-500/20 border-2 border-dashed border-blue-500 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-4 shadow-xl text-center mx-2">
+            <FileText className="h-12 w-12 text-blue-500 mx-auto mb-2" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-1 font-kanit">วางไฟล์ที่นี่</h3>
+            <p className="text-sm text-gray-600">รองรับรูปภาพและเอกสาร</p>
           </div>
         </div>
       )}
 
-      {/* Header */}
-      <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <Bot className="h-8 w-8 text-blue-600" />
-          <h1 className="text-xl font-semibold font-kanit">AI Web Agent</h1>
+      {/* Compact Header */}
+      <div className="bg-white border-b px-3 py-2 flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <Bot className="h-6 w-6 text-blue-600" />
+          <h1 className="text-lg font-semibold font-kanit">AI Agent</h1>
         </div>
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-3">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={mockUser.avatar || undefined} />
-              <AvatarFallback className="bg-blue-100 text-blue-600 text-sm font-medium">
-                <User className="h-4 w-4" />
-              </AvatarFallback>
-            </Avatar>
-            <span className="text-sm font-medium text-gray-700">{mockUser.name}</span>
-          </div>
-          <Button variant="ghost" onClick={handleLogout}>
-            <LogOut className="h-4 w-4 mr-2" />
-            ออกจากระบบ
+        <div className="flex items-center space-x-2">
+          <Avatar className="h-6 w-6">
+            <AvatarImage src={mockUser.avatar || undefined} />
+            <AvatarFallback className="bg-blue-100 text-blue-600 text-xs">
+              <User className="h-3 w-3" />
+            </AvatarFallback>
+          </Avatar>
+          <Button variant="ghost" size="sm" onClick={handleLogout} className="px-2">
+            <LogOut className="h-3 w-3" />
           </Button>
         </div>
       </div>
 
       {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.map((message) => (
           <div
             key={message.id}
             className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
           >
-            <div className={`flex space-x-3 max-w-3xl ${message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-              <div className="flex-shrink-0 flex flex-col items-center">
+            <div className={`flex space-x-2 max-w-[85%] ${message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+              <div className="flex-shrink-0">
                 {message.type === 'user' ? (
-                  <>
-                    <Avatar className="w-8 h-8">
-                      <AvatarImage src={mockUser.avatar || undefined} />
-                      <AvatarFallback className="bg-blue-600 text-white text-xs">
-                        <User className="h-4 w-4" />
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-xs text-gray-500 mt-1 text-center">{mockUser.name}</span>
-                  </>
+                  <Avatar className="w-6 h-6">
+                    <AvatarImage src={mockUser.avatar || undefined} />
+                    <AvatarFallback className="bg-blue-600 text-white text-xs">
+                      <User className="h-3 w-3" />
+                    </AvatarFallback>
+                  </Avatar>
                 ) : (
-                  <>
-                    <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
-                      <Bot className="h-4 w-4 text-white" />
-                    </div>
-                    <span className="text-xs text-gray-500 mt-1 text-center">AI Agent</span>
-                  </>
+                  <div className="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
+                    <Bot className="h-3 w-3 text-white" />
+                  </div>
                 )}
               </div>
               <Card className={`${message.type === 'user' ? 'bg-blue-600 text-white' : 'bg-white'}`}>
-                <CardContent className="p-3">
-                  <p className="text-sm">{message.content}</p>
+                <CardContent className="p-2">
+                  <p className="text-sm leading-relaxed">{message.content}</p>
                   {message.attachments && message.attachments.length > 0 && (
-                    <div className="mt-3">
-                      {/* Images with fixed size */}
+                    <div className="mt-2">
+                      {/* Images with compact size */}
                       {message.attachments.filter(att => att.type === 'image').length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-3">
+                        <div className="flex flex-wrap gap-1 mb-2">
                           {message.attachments
                             .filter(att => att.type === 'image')
                             .map((attachment, index) => (
                               <div key={index} className="relative group">
                                 <div 
-                                  className="cursor-pointer w-20 h-20"
+                                  className="cursor-pointer w-16 h-16"
                                   onClick={() => {
                                     console.log('Image clicked:', attachment);
                                     handleViewFile(attachment);
@@ -294,13 +283,12 @@ const ChatPage = () => {
                                   <img 
                                     src={attachment.url} 
                                     alt={attachment.name}
-                                    className="w-20 h-20 object-cover rounded-lg hover:opacity-90 transition-opacity"
+                                    className="w-16 h-16 object-cover rounded hover:opacity-90 transition-opacity"
                                   />
-                                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
-                                    <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded flex items-center justify-center">
+                                    <Eye className="h-3 w-3 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                                   </div>
                                 </div>
-                                <p className="text-xs mt-1 opacity-75 truncate w-20">{attachment.name}</p>
                               </div>
                             ))}
                         </div>
@@ -308,18 +296,18 @@ const ChatPage = () => {
                       
                       {/* Files (non-images) */}
                       {message.attachments.filter(att => att.type === 'file').length > 0 && (
-                        <div className="space-y-2">
+                        <div className="space-y-1">
                           {message.attachments
                             .filter(att => att.type === 'file')
                             .map((attachment, index) => (
                               <div 
                                 key={index}
-                                className={`flex items-center space-x-2 p-2 rounded border cursor-pointer hover:bg-opacity-80 transition-colors ${
+                                className={`flex items-center space-x-2 p-1 rounded border cursor-pointer hover:bg-opacity-80 transition-colors ${
                                   message.type === 'user' ? 'bg-blue-500 border-blue-400' : 'bg-gray-50 border-gray-200'
                                 }`}
                                 onClick={() => handleViewFile(attachment)}
                               >
-                                <FileText className="h-4 w-4" />
+                                <FileText className="h-3 w-3" />
                                 <span className="text-xs flex-1 truncate">{attachment.name}</span>
                                 <Download className="h-3 w-3 opacity-60" />
                               </div>
@@ -342,15 +330,14 @@ const ChatPage = () => {
         
         {isLoading && (
           <div className="flex justify-start">
-            <div className="flex space-x-3 max-w-3xl">
-              <div className="flex-shrink-0 flex flex-col items-center">
-                <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
-                  <Bot className="h-4 w-4 text-white" />
+            <div className="flex space-x-2 max-w-[85%]">
+              <div className="flex-shrink-0">
+                <div className="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
+                  <Bot className="h-3 w-3 text-white" />
                 </div>
-                <span className="text-xs text-gray-500 mt-1 text-center">AI Agent</span>
               </div>
               <Card className="bg-white">
-                <CardContent className="p-3">
+                <CardContent className="p-2">
                   <p className="text-sm text-gray-500">กำลังพิมพ์...</p>
                 </CardContent>
               </Card>
@@ -359,100 +346,100 @@ const ChatPage = () => {
         )}
       </div>
 
-      {/* Input Area */}
-      <div className="bg-white border-t p-6">
-        <div className="max-w-4xl mx-auto">
-          {/* Pending Files Preview */}
-          {pendingFiles.length > 0 && (
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-medium text-gray-700">ไฟล์ที่เลือก ({pendingFiles.length})</h4>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {pendingFiles.map((pendingFile, index) => (
-                  <div key={index} className="relative group">
-                    <div className="flex items-center space-x-2 bg-white p-2 rounded border">
-                      {pendingFile.type === 'image' ? (
-                        pendingFile.preview ? (
-                          <img 
-                            src={pendingFile.preview} 
-                            alt={pendingFile.file.name}
-                            className="w-8 h-8 object-cover rounded"
-                          />
-                        ) : (
-                          <Image className="h-4 w-4 text-blue-500" />
-                        )
+      {/* Compact Input Area */}
+      <div className="bg-white border-t p-3">
+        {/* Pending Files Preview */}
+        {pendingFiles.length > 0 && (
+          <div className="mb-3 p-2 bg-gray-50 rounded border">
+            <div className="flex items-center justify-between mb-1">
+              <h4 className="text-xs font-medium text-gray-700">ไฟล์ ({pendingFiles.length})</h4>
+            </div>
+            <div className="grid grid-cols-1 gap-1">
+              {pendingFiles.map((pendingFile, index) => (
+                <div key={index} className="relative group">
+                  <div className="flex items-center space-x-2 bg-white p-1 rounded border">
+                    {pendingFile.type === 'image' ? (
+                      pendingFile.preview ? (
+                        <img 
+                          src={pendingFile.preview} 
+                          alt={pendingFile.file.name}
+                          className="w-6 h-6 object-cover rounded"
+                        />
                       ) : (
-                        <FileText className="h-4 w-4 text-gray-500" />
-                      )}
-                      <span className="text-xs text-gray-700 flex-1 truncate">
-                        {pendingFile.file.name}
-                      </span>
-                      <button
-                        onClick={() => removePendingFile(index)}
-                        className="text-red-500 hover:text-red-700 flex-shrink-0"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
+                        <Image className="h-3 w-3 text-blue-500" />
+                      )
+                    ) : (
+                      <FileText className="h-3 w-3 text-gray-500" />
+                    )}
+                    <span className="text-xs text-gray-700 flex-1 truncate">
+                      {pendingFile.file.name}
+                    </span>
+                    <button
+                      onClick={() => removePendingFile(index)}
+                      className="text-red-500 hover:text-red-700 flex-shrink-0"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="flex space-x-3">
-            <div className="flex-1">
-              <Textarea
-                placeholder="พิมพ์คำสั่งที่ต้องการให้ AI ช่วยงาน หรือลากไฟล์มาวางที่หน้าจอ..."
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }
-                }}
-                className="min-h-[50px] resize-none"
-              />
-            </div>
-            <div className="flex flex-col space-y-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Paperclip className="h-4 w-4" />
-              </Button>
-              <Button
-                onClick={handleSendMessage}
-                disabled={(!inputMessage.trim() && pendingFiles.length === 0) || isLoading}
-                size="icon"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
+                </div>
+              ))}
             </div>
           </div>
-          
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/*,.pdf,.doc,.docx,.txt"
-            onChange={handleFileInputChange}
-            className="hidden"
-          />
-          
-          <div className="flex items-center space-x-4 mt-3 text-sm text-gray-500">
-            <div className="flex items-center space-x-1">
-              <Image className="h-4 w-4" />
-              <span>รูปภาพ</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <FileText className="h-4 w-4" />
-              <span>เอกสาร</span>
-            </div>
-            <span>หรือ Enter เพื่อส่งข้อความ | ลากไฟล์มาวาง</span>
+        )}
+
+        <div className="flex space-x-2">
+          <div className="flex-1">
+            <Textarea
+              placeholder="พิมพ์คำสั่ง..."
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              className="min-h-[40px] resize-none text-sm"
+              rows={2}
+            />
+          </div>
+          <div className="flex flex-col space-y-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              className="px-2"
+            >
+              <Paperclip className="h-3 w-3" />
+            </Button>
+            <Button
+              onClick={handleSendMessage}
+              disabled={(!inputMessage.trim() && pendingFiles.length === 0) || isLoading}
+              size="sm"
+              className="px-2"
+            >
+              <Send className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+        
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*,.pdf,.doc,.docx,.txt"
+          onChange={handleFileInputChange}
+          className="hidden"
+        />
+        
+        <div className="flex items-center space-x-2 mt-2 text-xs text-gray-500">
+          <div className="flex items-center space-x-1">
+            <Image className="h-3 w-3" />
+            <span>รูป</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <FileText className="h-3 w-3" />
+            <span>ไฟล์</span>
           </div>
         </div>
       </div>
