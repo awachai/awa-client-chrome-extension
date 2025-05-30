@@ -1,10 +1,10 @@
-
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog";
 import { Bot, User, Send, Paperclip, Image, FileText, LogOut, X, Download, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -42,6 +42,7 @@ const ChatPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [selectedImage, setSelectedImage] = useState<{ url: string; name: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -157,8 +158,8 @@ const ChatPage = () => {
   // Helper function to handle file viewing
   const handleViewFile = (attachment: { type: 'image' | 'file'; name: string; url: string }) => {
     if (attachment.type === 'image') {
-      // For images, open in new tab
-      window.open(attachment.url, '_blank');
+      // For images, open in modal
+      setSelectedImage({ url: attachment.url, name: attachment.name });
     } else {
       // For other files, download them
       const link = document.createElement('a');
@@ -177,6 +178,27 @@ const ChatPage = () => {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      {/* Image Modal */}
+      <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
+        <DialogContent className="max-w-4xl w-full p-0">
+          {selectedImage && (
+            <div className="relative">
+              <img 
+                src={selectedImage.url} 
+                alt={selectedImage.name}
+                className="w-full h-auto max-h-[80vh] object-contain"
+              />
+              <DialogClose className="absolute top-2 right-2 bg-black/50 text-white hover:bg-black/70 rounded-full p-2">
+                <X className="h-4 w-4" />
+              </DialogClose>
+              <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white p-4">
+                <p className="text-sm">{selectedImage.name}</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Drag overlay */}
       {isDragOver && (
         <div className="fixed inset-0 bg-blue-500/20 border-4 border-dashed border-blue-500 z-50 flex items-center justify-center">
