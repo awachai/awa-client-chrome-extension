@@ -1,34 +1,30 @@
 
 {
+  "manifest_version": 3,
   "name": "Chrome Thai Helper",
-  "short_name": "Thai Helper",
+  "version": "1.0.0",
   "description": "Chrome extension helper for Thai language learning and translation",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#3b82f6",
-  "orientation": "portrait-primary",
-  "icons": [
-    {
-      "src": "/favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
-    },
-    {
-      "src": "/placeholder.svg",
-      "type": "image/svg+xml",
-      "sizes": "192x192",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/placeholder.svg",
-      "type": "image/svg+xml", 
-      "sizes": "512x512",
-      "purpose": "any maskable"
-    }
+  "permissions": [
+    "activeTab",
+    "storage"
   ],
-  "categories": ["education", "utilities"],
-  "lang": "th",
-  "dir": "ltr",
-  "prefer_related_applications": false
+  "action": {
+    "default_popup": "index.html",
+    "default_title": "Thai Helper",
+    "default_icon": {
+      "16": "favicon.ico",
+      "32": "favicon.ico",
+      "48": "favicon.ico",
+      "128": "favicon.ico"
+    }
+  },
+  "icons": {
+    "16": "favicon.ico",
+    "32": "favicon.ico",
+    "48": "favicon.ico",
+    "128": "favicon.ico"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
 }
