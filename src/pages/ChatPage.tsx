@@ -157,8 +157,10 @@ const ChatPage = () => {
 
   // Helper function to handle file viewing
   const handleViewFile = (attachment: { type: 'image' | 'file'; name: string; url: string }) => {
+    console.log('handleViewFile called:', attachment);
     if (attachment.type === 'image') {
       // For images, open in modal
+      console.log('Setting selected image:', attachment);
       setSelectedImage({ url: attachment.url, name: attachment.name });
     } else {
       // For other files, download them
@@ -171,6 +173,11 @@ const ChatPage = () => {
     }
   };
 
+  const closeImageModal = () => {
+    console.log('Closing image modal');
+    setSelectedImage(null);
+  };
+
   return (
     <div 
       className="min-h-screen bg-gray-50 flex flex-col"
@@ -179,25 +186,28 @@ const ChatPage = () => {
       onDrop={handleDrop}
     >
       {/* Image Modal */}
-      <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
-        <DialogContent className="max-w-4xl w-full p-0">
-          {selectedImage && (
-            <div className="relative">
+      {selectedImage && (
+        <Dialog open={true} onOpenChange={closeImageModal}>
+          <DialogContent className="max-w-4xl w-full p-0 border-0">
+            <div className="relative bg-black rounded-lg overflow-hidden">
               <img 
                 src={selectedImage.url} 
                 alt={selectedImage.name}
                 className="w-full h-auto max-h-[80vh] object-contain"
               />
-              <DialogClose className="absolute top-2 right-2 bg-black/50 text-white hover:bg-black/70 rounded-full p-2">
+              <button
+                onClick={closeImageModal}
+                className="absolute top-4 right-4 bg-black/70 hover:bg-black/90 text-white rounded-full p-2 transition-colors z-10"
+              >
                 <X className="h-4 w-4" />
-              </DialogClose>
-              <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white p-4">
-                <p className="text-sm">{selectedImage.name}</p>
+              </button>
+              <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white p-4">
+                <p className="text-sm font-medium">{selectedImage.name}</p>
               </div>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Drag overlay */}
       {isDragOver && (
@@ -273,14 +283,21 @@ const ChatPage = () => {
                             .filter(att => att.type === 'image')
                             .map((attachment, index) => (
                               <div key={index} className="relative group">
-                                <img 
-                                  src={attachment.url} 
-                                  alt={attachment.name}
-                                  className="w-full h-32 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                                  onClick={() => handleViewFile(attachment)}
-                                />
-                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
-                                  <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <div 
+                                  className="cursor-pointer"
+                                  onClick={() => {
+                                    console.log('Image clicked:', attachment);
+                                    handleViewFile(attachment);
+                                  }}
+                                >
+                                  <img 
+                                    src={attachment.url} 
+                                    alt={attachment.name}
+                                    className="w-full h-32 object-cover rounded-lg hover:opacity-90 transition-opacity"
+                                  />
+                                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
+                                    <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </div>
                                 </div>
                                 <p className="text-xs mt-1 opacity-75 truncate">{attachment.name}</p>
                               </div>
