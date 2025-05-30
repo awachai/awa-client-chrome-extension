@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +26,7 @@ const ChatPage = () => {
   ]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -55,12 +57,35 @@ const ChatPage = () => {
     }, 1500);
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
+  const handleFileUpload = (files: FileList | null) => {
     if (files) {
-      // Handle file upload logic here
       console.log('Files selected:', files);
+      // Handle file upload logic here
+      Array.from(files).forEach(file => {
+        console.log(`File: ${file.name}, Size: ${file.size}, Type: ${file.type}`);
+      });
     }
+  };
+
+  const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    handleFileUpload(event.target.files);
+  };
+
+  const handleDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent) => {
+    event.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (event: React.DragEvent) => {
+    event.preventDefault();
+    setIsDragOver(false);
+    const files = event.dataTransfer.files;
+    handleFileUpload(files);
   };
 
   const handleLogout = () => {
@@ -68,7 +93,23 @@ const ChatPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div 
+      className="min-h-screen bg-gray-50 flex flex-col"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {isDragOver && (
+        <div className="fixed inset-0 bg-blue-500/20 border-4 border-dashed border-blue-500 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-8 shadow-xl text-center">
+            <FileText className="h-16 w-16 text-blue-500 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2 font-kanit">วางไฟล์ที่นี่</h3>
+            <p className="text-gray-600">รองรับรูปภาพและเอกสาร</p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
         <div className="flex items-center space-x-3">
@@ -135,7 +176,7 @@ const ChatPage = () => {
           <div className="flex space-x-3">
             <div className="flex-1">
               <Textarea
-                placeholder="พิมพ์คำสั่งที่ต้องการให้ AI ช่วยงาน..."
+                placeholder="พิมพ์คำสั่งที่ต้องการให้ AI ช่วยงาน หรือลากไฟล์มาวางที่หน้าจอ..."
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={(e) => {
@@ -170,7 +211,7 @@ const ChatPage = () => {
             type="file"
             multiple
             accept="image/*,.pdf,.doc,.docx,.txt"
-            onChange={handleFileUpload}
+            onChange={handleFileInputChange}
             className="hidden"
           />
           
@@ -183,7 +224,7 @@ const ChatPage = () => {
               <FileText className="h-4 w-4" />
               <span>เอกสาร</span>
             </div>
-            <span>หรือ Enter เพื่อส่งข้อความ</span>
+            <span>หรือ Enter เพื่อส่งข้อความ | ลากไฟล์มาวาง</span>
           </div>
         </div>
       </div>
