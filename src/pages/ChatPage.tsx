@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog";
-import { Bot, User, Send, Paperclip, Image, FileText, LogOut, X, Download, Eye, Wifi, WifiOff, CheckCircle, XCircle } from "lucide-react";
+import { Bot, User, Send, Paperclip, Image, FileText, LogOut, X, Download, Eye, Wifi, WifiOff, CheckCircle, XCircle, Code, Bug } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useWebSocket } from "../hooks/useWebSocket";
 import { CommandHandler, WebSocketCommand } from "../utils/commandHandler";
@@ -13,11 +13,13 @@ import { useToast } from "@/hooks/use-toast";
 
 interface Message {
   id: string;
-  type: 'user' | 'ai';
+  type: 'user' | 'ai' | 'debug';
   content: string;
   timestamp: Date;
   attachments?: { type: 'image' | 'file'; name: string; url: string }[];
   commandResult?: any;
+  isJson?: boolean;
+  jsonCommand?: any;
 }
 
 interface PendingFile {
@@ -38,7 +40,7 @@ const ChatPage = () => {
     {
       id: '1',
       type: 'ai',
-      content: 'สวัสดีครับ! ผมคือ AI Web Agent ของคุณ ผมสามารถช่วยคุณควบคุมและทำงานกับบราวเซอร์ได้ คุณต้องการให้ผมช่วยอะไรครับ?',
+      content: 'สวัสดีครับ! ผมคือ AI Web Agent ของคุณ ผมสามารถช่วยคุณควบคุมและทำงานกับบราวเซอร์ได้ คุณต้องการให้ผมช่วยอะไรครับ?\n\n💡 เคล็ดลับ: คุณสามารถส่งคำสั่ง JSON โดยตรงเพื่อควบคุม DOM elements ได้ เช่น:\n{"type": "command", "action": "highlight", "selector": "#button"}',
       timestamp: new Date(),
     }
   ]);
@@ -48,9 +50,25 @@ const ChatPage = () => {
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [selectedImage, setSelectedImage] = useState<{ url: string; name: string } | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ message: string; resolve: (confirmed: boolean) => void } | null>(null);
+  const [debugMode, setDebugMode] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Helper function to detect and parse JSON
+  const tryParseJSON = (str: string): { isJson: boolean; parsed?: any } => {
+    try {
+      const trimmed = str.trim();
+      if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || 
+          (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+        const parsed = JSON.parse(trimmed);
+        return { isJson: true, parsed };
+      }
+    } catch (e) {
+      // Not valid JSON
+    }
+    return { isJson: false };
+  };
 
   // Command handler for processing WebSocket commands
   const commandHandler = new CommandHandler({
@@ -79,13 +97,15 @@ const ChatPage = () => {
       });
     },
     onDebugMessage: (message: string) => {
-      const debugMessage: Message = {
-        id: Date.now().toString(),
-        type: 'ai',
-        content: message,
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, debugMessage]);
+      if (debugMode) {
+        const debugMessage: Message = {
+          id: Date.now().toString(),
+          type: 'debug',
+          content: message,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, debugMessage]);
+      }
     }
   });
 
@@ -153,9 +173,11 @@ const ChatPage = () => {
     });
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputMessage.trim() && pendingFiles.length === 0) return;
 
+    const { isJson, parsed } = tryParseJSON(inputMessage);
+    
     // Create blob URLs for file attachments to make them viewable
     const attachments = pendingFiles.map(pf => ({
       type: pf.type,
@@ -168,44 +190,82 @@ const ChatPage = () => {
       type: 'user',
       content: inputMessage || (pendingFiles.length > 0 ? `ส่งไฟล์ ${pendingFiles.length} ไฟล์` : ''),
       timestamp: new Date(),
-      attachments
+      attachments,
+      isJson,
+      jsonCommand: isJson ? parsed : undefined
     };
 
     setMessages(prev => [...prev, userMessage]);
     
-    // Send message via WebSocket only if connected
-    if (isConnected) {
-      const wsMessage = {
-        type: 'user_message',
-        content: inputMessage,
-        attachments: attachments.map(att => ({
-          type: att.type,
-          name: att.name
-        })),
-        timestamp: new Date().toISOString()
-      };
-      
-      const sent = sendMessage(wsMessage);
-      if (!sent) {
-        console.warn('Failed to send message via WebSocket');
+    // If it's a JSON command, execute it directly
+    if (isJson) {
+      if (debugMode) {
+        const debugMessage: Message = {
+          id: (Date.now() + 0.5).toString(),
+          type: 'debug',
+          content: `🔍 ตรวจพบคำสั่ง JSON: ${JSON.stringify(parsed, null, 2)}`,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, debugMessage]);
       }
+
+      try {
+        const result = await commandHandler.executeCommand(parsed as WebSocketCommand);
+        
+        const resultMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          type: 'ai',
+          content: `✅ ดำเนินการคำสั่ง JSON สำเร็จ: ${parsed.action || parsed.type}`,
+          timestamp: new Date(),
+          commandResult: result
+        };
+        setMessages(prev => [...prev, resultMessage]);
+        
+      } catch (error) {
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          type: 'ai',
+          content: `❌ เกิดข้อผิดพลาดในการดำเนินการคำสั่ง JSON: ${error}`,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      }
+    } else {
+      // Send message via WebSocket only if connected
+      if (isConnected) {
+        const wsMessage = {
+          type: 'user_message',
+          content: inputMessage,
+          attachments: attachments.map(att => ({
+            type: att.type,
+            name: att.name
+          })),
+          timestamp: new Date().toISOString()
+        };
+        
+        const sent = sendMessage(wsMessage);
+        if (!sent) {
+          console.warn('Failed to send message via WebSocket');
+        }
+      }
+
+      setIsLoading(true);
+
+      // Simulate AI response (remove this when real WebSocket responses are implemented)
+      setTimeout(() => {
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          type: 'ai',
+          content: `ได้รับคำสั่ง: "${inputMessage}" ${attachments.length > 0 ? `และไฟล์ ${attachments.length} ไฟล์` : ''} ${isConnected ? 'ส่งผ่าน WebSocket แล้ว' : '(WebSocket ไม่เชื่อมต่อ)'}`,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, aiMessage]);
+        setIsLoading(false);
+      }, 1500);
     }
 
     setInputMessage("");
     setPendingFiles([]);
-    setIsLoading(true);
-
-    // Simulate AI response (remove this when real WebSocket responses are implemented)
-    setTimeout(() => {
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'ai',
-        content: `ได้รับคำสั่ง: "${inputMessage}" ${attachments.length > 0 ? `และไฟล์ ${attachments.length} ไฟล์` : ''} ${isConnected ? 'ส่งผ่าน WebSocket แล้ว' : '(WebSocket ไม่เชื่อมต่อ)'}`,
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, aiMessage]);
-      setIsLoading(false);
-    }, 1500);
   };
 
   const handleFileUpload = async (files: FileList | null) => {
@@ -363,6 +423,16 @@ const ChatPage = () => {
               {isConnected ? 'Connected' : 'Disconnected'}
             </span>
           </div>
+          {/* Debug Mode Toggle */}
+          <Button
+            variant={debugMode ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setDebugMode(!debugMode)}
+            className="px-2 h-6"
+          >
+            <Bug className="h-3 w-3 mr-1" />
+            <span className="text-xs">Debug</span>
+          </Button>
         </div>
         <div className="flex items-center space-x-2">
           <Avatar className="h-6 w-6">
@@ -420,15 +490,44 @@ const ChatPage = () => {
                       <User className="h-3 w-3" />
                     </AvatarFallback>
                   </Avatar>
+                ) : message.type === 'debug' ? (
+                  <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center">
+                    <Bug className="h-3 w-3 text-white" />
+                  </div>
                 ) : (
                   <div className="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
                     <Bot className="h-3 w-3 text-white" />
                   </div>
                 )}
               </div>
-              <Card className={`${message.type === 'user' ? 'bg-blue-600 text-white' : 'bg-white'}`}>
+              <Card className={`${
+                message.type === 'user' ? 'bg-blue-600 text-white' : 
+                message.type === 'debug' ? 'bg-purple-100 border-purple-200' : 
+                'bg-white'
+              }`}>
                 <CardContent className="p-2">
-                  <p className="text-sm leading-relaxed">{message.content}</p>
+                  {/* JSON Command Indicator */}
+                  {message.isJson && (
+                    <div className="flex items-center space-x-1 mb-2 text-xs">
+                      <Code className="h-3 w-3" />
+                      <span className="font-medium text-orange-600">JSON Command</span>
+                    </div>
+                  )}
+                  
+                  <p className={`text-sm leading-relaxed ${
+                    message.type === 'debug' ? 'text-purple-800 font-mono' : ''
+                  }`}>
+                    {message.content}
+                  </p>
+                  
+                  {/* JSON Command Preview */}
+                  {message.isJson && message.jsonCommand && (
+                    <div className="mt-2 p-2 bg-gray-800 rounded text-xs">
+                      <pre className="text-green-400 font-mono overflow-x-auto">
+                        {JSON.stringify(message.jsonCommand, null, 2)}
+                      </pre>
+                    </div>
+                  )}
                   
                   {/* Command Result Display */}
                   {message.commandResult && (
@@ -505,7 +604,11 @@ const ChatPage = () => {
                     </div>
                   )}
                   
-                  <p className={`text-xs mt-1 ${message.type === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
+                  <p className={`text-xs mt-1 ${
+                    message.type === 'user' ? 'text-blue-100' : 
+                    message.type === 'debug' ? 'text-purple-600' :
+                    'text-gray-500'
+                  }`}>
                     {message.timestamp.toLocaleTimeString('th-TH', { 
                       hour: '2-digit', 
                       minute: '2-digit' 
@@ -579,7 +682,7 @@ const ChatPage = () => {
         <div className="flex space-x-2">
           <div className="flex-1">
             <Textarea
-              placeholder="พิมพ์คำสั่ง..."
+              placeholder="พิมพ์คำสั่ง... (รองรับ JSON command)"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={(e) => {
@@ -621,15 +724,27 @@ const ChatPage = () => {
           className="hidden"
         />
         
-        <div className="flex items-center space-x-2 mt-2 text-xs text-gray-500">
-          <div className="flex items-center space-x-1">
-            <Image className="h-3 w-3" />
-            <span>รูป</span>
+        <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
+          <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1">
+              <Image className="h-3 w-3" />
+              <span>รูป</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <FileText className="h-3 w-3" />
+              <span>ไฟล์</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <Code className="h-3 w-3" />
+              <span>JSON</span>
+            </div>
           </div>
-          <div className="flex items-center space-x-1">
-            <FileText className="h-3 w-3" />
-            <span>ไฟล์</span>
-          </div>
+          {debugMode && (
+            <div className="flex items-center space-x-1 text-purple-600">
+              <Bug className="h-3 w-3" />
+              <span>Debug Mode</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
