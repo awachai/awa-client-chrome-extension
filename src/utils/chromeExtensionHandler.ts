@@ -22,33 +22,25 @@ export class ChromeExtensionHandler {
     }
   }
 
-  private debugLog(message: string, data: any = null) {
-    const timestamp = new Date().toISOString();
-    console.log(`[CHROME_EXT_DEBUG ${timestamp}] ${message}`, data ? data : '');
-  }
-
   private async notifySidePanelOpened() {
     try {
       const chrome = (window as any).chrome;
-      this.debugLog('📤 Sending side panel opened signal');
-      
       chrome.runtime.sendMessage({
         type: 'SIDE_PANEL_OPENED'
       }, (response: any) => {
         if (chrome.runtime.lastError) {
-          this.debugLog('❌ Failed to send side panel opened signal:', chrome.runtime.lastError.message);
+          console.log('Failed to send side panel opened signal:', chrome.runtime.lastError.message);
         } else {
-          this.debugLog('✅ Side panel opened signal sent successfully:', response);
+          console.log('Side panel opened signal sent successfully');
         }
       });
     } catch (error) {
-      this.debugLog('❌ Error sending side panel opened signal:', error);
+      console.error('Error sending side panel opened signal:', error);
     }
   }
 
   async executeCommand(command: ChromeCommand): Promise<any> {
     if (!this.isExtensionContext) {
-      this.debugLog('❌ Not running in Chrome Extension context');
       return { 
         success: false, 
         error: 'Not running in Chrome Extension context' 
@@ -56,7 +48,7 @@ export class ChromeExtensionHandler {
     }
 
     try {
-      this.debugLog('🚀 Sending command to background script:', command);
+      console.log('Sending command to background script:', command);
       
       const chrome = (window as any).chrome;
       
@@ -66,19 +58,17 @@ export class ChromeExtensionHandler {
           command: command
         }, (response: any) => {
           if (chrome.runtime.lastError) {
-            this.debugLog('❌ Background script error:', chrome.runtime.lastError.message);
             reject(new Error(chrome.runtime.lastError.message));
           } else {
-            this.debugLog('✅ Background script response:', response);
             resolve(response);
           }
         });
       });
       
-      this.debugLog('📨 Final command result:', result);
+      console.log('Command result from content script:', result);
       return result;
     } catch (error) {
-      this.debugLog('❌ Chrome extension command error:', error);
+      console.error('Chrome extension command error:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error' 

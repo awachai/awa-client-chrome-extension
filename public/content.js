@@ -1,4 +1,3 @@
-
 // Content Script - ทำงานบนหน้าเว็บจริง
 (function() {
   'use strict';
@@ -6,7 +5,7 @@
   console.log('AI Web Agent Content Script loading on:', window.location.href);
 
   // ป้องกันการ inject ซ้ำโดยใช้ unique identifier
-  const SCRIPT_ID = 'ai-web-agent-content-script-v5';
+  const SCRIPT_ID = 'ai-web-agent-content-script-v4';
   
   // ตรวจสอบว่า script ถูกโหลดแล้วหรือไม่
   if (window[SCRIPT_ID]) {
@@ -16,13 +15,7 @@
   
   // ทำเครื่องหมายว่า script ถูกโหลดแล้ว
   window[SCRIPT_ID] = true;
-  console.log('[CONTENT_DEBUG] Initializing content script...');
-
-  // เพิ่ม debug function
-  function debugLog(message, data = null) {
-    const timestamp = new Date().toISOString();
-    console.log(`[CONTENT_DEBUG ${timestamp}] ${message}`, data ? data : '');
-  }
+  console.log('Initializing content script...');
 
   // ContentDOMUtils Class
   window.ContentDOMUtils = class ContentDOMUtils {
@@ -176,43 +169,33 @@
   // ContentCommandHandler Class
   window.ContentCommandHandler = class ContentCommandHandler {
     static async executeCommand(command) {
-      debugLog('🔧 Executing command:', command);
+      console.log('Content Script executing command:', command);
 
       try {
-        let result;
         switch (command.action) {
           case 'highlight':
-            result = await this.highlightElement(command.selector);
-            break;
+            return await this.highlightElement(command.selector);
           
           case 'click':
-            result = await this.clickElement(command.selector);
-            break;
+            return await this.clickElement(command.selector);
           
           case 'scroll_to':
-            result = await this.scrollToElement(command.selector);
-            break;
+            return await this.scrollToElement(command.selector);
           
           case 'get_dom':
-            result = this.getPageDOM();
-            break;
+            return this.getPageDOM();
           
           case 'fill_form':
-            result = this.fillForm(command.data);
-            break;
+            return this.fillForm(command.data);
 
           case 'scan_elements':
-            result = this.scanElements();
-            break;
+            return this.scanElements();
           
           default:
-            result = { success: false, error: `Unknown action: ${command.action}` };
+            return { success: false, error: `Unknown action: ${command.action}` };
         }
-        
-        debugLog('✅ Command result:', result);
-        return result;
       } catch (error) {
-        debugLog('❌ Command execution error:', error);
+        console.error('Command execution error:', error);
         return { success: false, error: error.message };
       }
     }
@@ -448,87 +431,75 @@
 
   // Chrome Runtime Message Listener
   function handleMessage(message, sender, sendResponse) {
-    debugLog('📨 Content script received message:', message);
-    debugLog('📨 Message sender:', sender);
+    console.log('Content script received message:', message);
     
     // Handle ping/pong for checking if script is alive
     if (message.type === 'PING') {
-      debugLog('🏓 Responding to PING');
-      sendResponse({ pong: true, timestamp: new Date().toISOString() });
+      sendResponse({ pong: true });
       return;
     }
     
     if (message.type === 'DOM_COMMAND') {
-      debugLog('🎯 Processing DOM command:', message.command);
-      
       window.ContentCommandHandler.executeCommand(message.command)
         .then(result => {
-          debugLog('✅ Command completed:', result);
+          console.log('Content script command result:', result);
           sendResponse(result);
         })
         .catch(error => {
-          debugLog('❌ Command failed:', error);
+          console.error('Content script command error:', error);
           sendResponse({ success: false, error: error.message });
         });
       
       return true; // Async response
     }
-
-    debugLog('❓ Unknown message type:', message.type);
   }
 
   // Remove existing listener if it exists
   if (chrome.runtime && chrome.runtime.onMessage) {
     try {
       chrome.runtime.onMessage.removeListener(handleMessage);
-      debugLog('🗑️ Removed existing message listener');
     } catch (e) {
-      debugLog('⚠️ No existing listener to remove');
+      // Ignore error if listener doesn't exist
     }
     chrome.runtime.onMessage.addListener(handleMessage);
-    debugLog('✅ Added new message listener');
   }
 
   // Send ready signal when DOM is fully loaded
   function sendReadySignal() {
     if (typeof chrome === 'undefined' || !chrome.runtime) {
-      debugLog('❌ Chrome runtime not available, skipping ready signal');
+      console.log('Chrome runtime not available, skipping ready signal');
       return;
     }
 
     try {
-      const readyData = {
+      chrome.runtime.sendMessage({
         type: 'CONTENT_SCRIPT_READY',
         url: window.location.href,
         title: document.title,
         timestamp: new Date().toISOString()
-      };
-      
-      debugLog('📤 Sending ready signal:', readyData);
-      
-      chrome.runtime.sendMessage(readyData, (response) => {
+      }, (response) => {
         if (chrome.runtime.lastError) {
-          debugLog('❌ Failed to send ready signal:', chrome.runtime.lastError.message);
+          console.log('Failed to send ready signal:', chrome.runtime.lastError.message);
         } else {
-          debugLog('✅ Ready signal sent successfully:', response);
+          console.log('Content script ready signal sent successfully');
         }
       });
     } catch (error) {
-      debugLog('❌ Error sending ready signal:', error);
+      console.error('Error sending ready signal:', error);
     }
   }
 
   // Initialize when ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-      debugLog('📄 DOM loaded, sending ready signal');
+      console.log('DOM loaded, sending ready signal');
       setTimeout(sendReadySignal, 100);
     });
   } else {
-    debugLog('📄 DOM already loaded, sending ready signal immediately');
+    console.log('DOM already loaded, sending ready signal immediately');
     setTimeout(sendReadySignal, 100);
   }
 
-  debugLog('🚀 Content script initialization complete');
+  console.log('Content script initialization complete');
 
 })(); // End of IIFE
