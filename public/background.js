@@ -59,29 +59,43 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-// Execute command on target tab (side panel tab หรือ active tab)
+// Execute command on target tab (side panel tab เป็นหลัก)
 async function executeCommandOnTargetTab(command) {
   try {
     console.log('Executing command on target tab:', command);
     
     let targetTab = null;
     
-    // ลองใช้ side panel tab ก่อน
+    // ใช้ side panel tab เป็นหลัก
     if (sidePanelTabId) {
       try {
         targetTab = await chrome.tabs.get(sidePanelTabId);
         console.log(`Using side panel tab: ${targetTab.id}, URL: ${targetTab.url}`);
+        
+        // ตรวจสอบว่า tab ยังมีอยู่และเข้าถึงได้
+        if (!targetTab.url || targetTab.url.startsWith('chrome://') || targetTab.url.startsWith('chrome-extension://')) {
+          console.log(`Side panel tab ${sidePanelTabId} is not accessible, will try active tab`);
+          targetTab = null;
+          sidePanelTabId = null;
+        }
       } catch (error) {
-        console.log(`Side panel tab ${sidePanelTabId} no longer exists, clearing...`);
+        console.log(`Side panel tab ${sidePanelTabId} no longer exists:`, error);
         sidePanelTabId = null;
+        targetTab = null;
       }
     }
     
     // ถ้าไม่มี side panel tab หรือไม่สามารถใช้ได้ ใช้ active tab
     if (!targetTab) {
-      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      targetTab = activeTab;
-      console.log(`Using active tab: ${targetTab?.id}, URL: ${targetTab?.url}`);
+      try {
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (activeTab && activeTab.id) {
+          targetTab = activeTab;
+          console.log(`Using active tab: ${targetTab.id}, URL: ${targetTab.url}`);
+        }
+      } catch (error) {
+        console.log('Failed to get active tab:', error);
+      }
     }
     
     if (!targetTab || !targetTab.id) {
