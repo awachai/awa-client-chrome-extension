@@ -5,9 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog";
-import { Bot, User, Send, Paperclip, Image, FileText, LogOut, X, Download, Eye, Wifi, WifiOff } from "lucide-react";
+import { Bot, User, Send, Paperclip, Image, FileText, LogOut, X, Download, Eye, Wifi, WifiOff, CheckCircle, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useWebSocket } from "../hooks/useWebSocket";
+import { CommandHandler, WebSocketCommand } from "../utils/commandHandler";
+import { useToast } from "@/hooks/use-toast";
 
 interface Message {
   id: string;
@@ -15,6 +17,7 @@ interface Message {
   content: string;
   timestamp: Date;
   attachments?: { type: 'image' | 'file'; name: string; url: string }[];
+  commandResult?: any;
 }
 
 interface PendingFile {
@@ -44,11 +47,79 @@ const ChatPage = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [selectedImage, setSelectedImage] = useState<{ url: string; name: string } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{ message: string; resolve: (confirmed: boolean) => void } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
-  // WebSocket connection with retry functionality
+  // Command handler for processing WebSocket commands
+  const commandHandler = new CommandHandler({
+    onTextMessage: (message: string) => {
+      const aiMessage: Message = {
+        id: Date.now().toString(),
+        type: 'ai',
+        content: message,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, aiMessage]);
+    },
+    onImageReceived: (imageUrl: string) => {
+      const aiMessage: Message = {
+        id: Date.now().toString(),
+        type: 'ai',
+        content: 'ได้รับรูปภาพจาก AI',
+        timestamp: new Date(),
+        attachments: [{ type: 'image', name: 'AI Image', url: imageUrl }]
+      };
+      setMessages(prev => [...prev, aiMessage]);
+    },
+    onConfirmRequest: (message: string) => {
+      return new Promise<boolean>((resolve) => {
+        setConfirmDialog({ message, resolve });
+      });
+    }
+  });
+
+  // WebSocket connection with message handling
   const { isConnected, messages: wsMessages, error: wsError, sendMessage, retry, clearError } = useWebSocket('nueng');
+
+  // Process WebSocket messages
+  React.useEffect(() => {
+    if (wsMessages.length > 0) {
+      const latestMessage = wsMessages[wsMessages.length - 1];
+      console.log('Processing WebSocket message:', latestMessage);
+      
+      try {
+        // Try to parse as command
+        if (typeof latestMessage === 'object' && latestMessage !== null) {
+          commandHandler.executeCommand(latestMessage as WebSocketCommand).then(result => {
+            console.log('Command execution result:', result);
+            
+            // Add command result to the last AI message if it exists
+            if (result && result.success !== undefined) {
+              setMessages(prev => {
+                const lastMessage = prev[prev.length - 1];
+                if (lastMessage && lastMessage.type === 'ai') {
+                  return [
+                    ...prev.slice(0, -1),
+                    { ...lastMessage, commandResult: result }
+                  ];
+                }
+                return prev;
+              });
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Error processing WebSocket command:', error);
+        toast({
+          title: "Command Error",
+          description: "Failed to process command from server",
+          variant: "destructive",
+        });
+      }
+    }
+  }, [wsMessages]);
 
   // Helper function to get user initials
   const getUserInitials = (name: string) => {
@@ -178,15 +249,12 @@ const ChatPage = () => {
     navigate('/login');
   };
 
-  // Helper function to handle file viewing
   const handleViewFile = (attachment: { type: 'image' | 'file'; name: string; url: string }) => {
     console.log('handleViewFile called:', attachment);
     if (attachment.type === 'image') {
-      // For images, open in modal
       console.log('Setting selected image:', attachment);
       setSelectedImage({ url: attachment.url, name: attachment.name });
     } else {
-      // For other files, download them
       const link = document.createElement('a');
       link.href = attachment.url;
       link.download = attachment.name;
@@ -201,6 +269,13 @@ const ChatPage = () => {
     setSelectedImage(null);
   };
 
+  const handleConfirmResponse = (confirmed: boolean) => {
+    if (confirmDialog) {
+      confirmDialog.resolve(confirmed);
+      setConfirmDialog(null);
+    }
+  };
+
   return (
     <div 
       className="h-screen bg-gray-50 flex flex-col max-w-full"
@@ -208,6 +283,26 @@ const ChatPage = () => {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      {/* Confirmation Dialog */}
+      {confirmDialog && (
+        <Dialog open={true} onOpenChange={() => handleConfirmResponse(false)}>
+          <DialogContent className="max-w-md">
+            <div className="p-4">
+              <h3 className="text-lg font-semibold mb-4">ยืนยันการทำงาน</h3>
+              <p className="text-gray-700 mb-6">{confirmDialog.message}</p>
+              <div className="flex space-x-3 justify-end">
+                <Button variant="outline" onClick={() => handleConfirmResponse(false)}>
+                  ยกเลิก
+                </Button>
+                <Button onClick={() => handleConfirmResponse(true)}>
+                  ยืนยัน
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Image Modal */}
       {selectedImage && (
         <Dialog open={true} onOpenChange={closeImageModal}>
@@ -325,9 +420,32 @@ const ChatPage = () => {
               <Card className={`${message.type === 'user' ? 'bg-blue-600 text-white' : 'bg-white'}`}>
                 <CardContent className="p-2">
                   <p className="text-sm leading-relaxed">{message.content}</p>
+                  
+                  {/* Command Result Display */}
+                  {message.commandResult && (
+                    <div className="mt-2 p-2 bg-gray-100 rounded text-xs">
+                      <div className="flex items-center space-x-1 mb-1">
+                        {message.commandResult.success ? (
+                          <CheckCircle className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <XCircle className="h-3 w-3 text-red-500" />
+                        )}
+                        <span className={`font-medium ${message.commandResult.success ? 'text-green-700' : 'text-red-700'}`}>
+                          {message.commandResult.action}
+                        </span>
+                      </div>
+                      {message.commandResult.error && (
+                        <p className="text-red-600">{message.commandResult.error}</p>
+                      )}
+                      {message.commandResult.selector && (
+                        <p className="text-gray-600">Target: {message.commandResult.selector}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Images with compact size */}
                   {message.attachments && message.attachments.length > 0 && (
                     <div className="mt-2">
-                      {/* Images with compact size */}
                       {message.attachments.filter(att => att.type === 'image').length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-2">
                           {message.attachments
@@ -377,6 +495,7 @@ const ChatPage = () => {
                       )}
                     </div>
                   )}
+                  
                   <p className={`text-xs mt-1 ${message.type === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
                     {message.timestamp.toLocaleTimeString('th-TH', { 
                       hour: '2-digit', 
