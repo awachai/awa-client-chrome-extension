@@ -11,7 +11,10 @@ export class ChromeExtensionHandler {
 
   constructor() {
     // ตรวจสอบว่าอยู่ใน Chrome Extension context หรือไม่
-    this.isExtensionContext = typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id;
+    this.isExtensionContext = typeof window !== 'undefined' && 
+                              typeof (window as any).chrome !== 'undefined' && 
+                              (window as any).chrome.runtime && 
+                              (window as any).chrome.runtime.id;
   }
 
   async executeCommand(command: ChromeCommand): Promise<any> {
@@ -25,11 +28,13 @@ export class ChromeExtensionHandler {
     try {
       console.log('Sending command to background script:', command);
       
+      const chrome = (window as any).chrome;
+      
       const result = await new Promise((resolve, reject) => {
         chrome.runtime.sendMessage({
           type: 'EXECUTE_DOM_COMMAND',
           command: command
-        }, (response) => {
+        }, (response: any) => {
           if (chrome.runtime.lastError) {
             reject(new Error(chrome.runtime.lastError.message));
           } else {
