@@ -1,3 +1,4 @@
+
 // Content Script - ทำงานบนหน้าเว็บจริง
 console.log('AI Web Agent Content Script loaded on:', window.location.href);
 
@@ -109,9 +110,9 @@ class ContentDOMUtils {
     const searchTerm = selector.replace(/[#.]/g, '').toLowerCase();
     
     allElements.forEach(el => {
-      const id = el.id?.toLowerCase();
-      const className = el.className?.toString().toLowerCase();
-      const textContent = el.textContent?.toLowerCase().trim();
+      const id = el.id ? el.id.toLowerCase() : '';
+      const className = el.className ? el.className.toString().toLowerCase() : '';
+      const textContent = el.textContent ? el.textContent.toLowerCase().trim() : '';
       
       if (
         (id && id.includes(searchTerm)) ||
@@ -123,8 +124,8 @@ class ContentDOMUtils {
           element: el,
           tagName: el.tagName.toLowerCase(),
           id: el.id,
-          className: el.className?.toString(),
-          textContent: el.textContent?.substring(0, 50)
+          className: el.className ? el.className.toString() : '',
+          textContent: el.textContent ? el.textContent.substring(0, 50) : ''
         });
       }
     });
@@ -143,8 +144,8 @@ class ContentDOMUtils {
         element: el,
         tagName: el.tagName.toLowerCase(),
         id: el.id,
-        className: el.className?.toString(),
-        textContent: el.textContent?.substring(0, 50)
+        className: el.className ? el.className.toString() : '',
+        textContent: el.textContent ? el.textContent.substring(0, 50) : ''
       }));
   }
 }
@@ -249,7 +250,7 @@ class ContentCommandHandler {
         found: true,
         elementInfo: {
           tag: element.tagName.toLowerCase(),
-          text: element.textContent?.substring(0, 100),
+          text: element.textContent ? element.textContent.substring(0, 100) : '',
           isInteractable: ContentDOMUtils.isInteractable(element)
         }
       };
@@ -296,7 +297,7 @@ class ContentCommandHandler {
           error: `Element "${selector}" is not interactable`,
           elementInfo: {
             tag: element.tagName.toLowerCase(),
-            text: element.textContent?.substring(0, 100),
+            text: element.textContent ? element.textContent.substring(0, 100) : '',
             isVisible: element.getBoundingClientRect().width > 0
           }
         };
@@ -318,7 +319,7 @@ class ContentCommandHandler {
         clicked: true,
         elementInfo: {
           tag: element.tagName.toLowerCase(),
-          text: element.textContent?.substring(0, 100)
+          text: element.textContent ? element.textContent.substring(0, 100) : ''
         }
       };
     } catch (error) {
@@ -414,27 +415,34 @@ class ContentCommandHandler {
 }
 
 // Listen for messages from extension
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('Content script received message:', message);
-  
-  if (message.type === 'DOM_COMMAND') {
-    ContentCommandHandler.executeCommand(message.command)
-      .then(result => {
-        console.log('Content script command result:', result);
-        sendResponse(result);
-      })
-      .catch(error => {
-        console.error('Content script command error:', error);
-        sendResponse({ success: false, error: error.message });
-      });
+if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('Content script received message:', message);
     
-    // Return true to indicate we'll send response asynchronously
-    return true;
-  }
-});
+    if (message.type === 'DOM_COMMAND') {
+      ContentCommandHandler.executeCommand(message.command)
+        .then(result => {
+          console.log('Content script command result:', result);
+          sendResponse(result);
+        })
+        .catch(error => {
+          console.error('Content script command error:', error);
+          sendResponse({ success: false, error: error.message });
+        });
+      
+      // Return true to indicate we'll send response asynchronously
+      return true;
+    }
+  });
+}
 
 // Send ready signal when DOM is fully loaded
 function sendReadySignal() {
+  if (typeof chrome === 'undefined' || !chrome.runtime) {
+    console.log('Chrome runtime not available, skipping ready signal');
+    return;
+  }
+
   try {
     chrome.runtime.sendMessage({
       type: 'CONTENT_SCRIPT_READY',
