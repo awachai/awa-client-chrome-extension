@@ -1,6 +1,5 @@
-
 // Content Script - ทำงานบนหน้าเว็บจริง
-console.log('AI Web Agent Content Script loaded');
+console.log('AI Web Agent Content Script loaded on:', window.location.href);
 
 class ContentDOMUtils {
   // หา element ด้วยหลายวิธี
@@ -434,9 +433,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-// Send ready signal
-chrome.runtime.sendMessage({
-  type: 'CONTENT_SCRIPT_READY',
-  url: window.location.href,
-  title: document.title
-});
+// Send ready signal when DOM is fully loaded
+function sendReadySignal() {
+  try {
+    chrome.runtime.sendMessage({
+      type: 'CONTENT_SCRIPT_READY',
+      url: window.location.href,
+      title: document.title,
+      timestamp: new Date().toISOString()
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.log('Failed to send ready signal:', chrome.runtime.lastError.message);
+      } else {
+        console.log('Content script ready signal sent successfully');
+      }
+    });
+  } catch (error) {
+    console.error('Error sending ready signal:', error);
+  }
+}
+
+// Send ready signal immediately and when DOM changes
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', sendReadySignal);
+} else {
+  sendReadySignal();
+}
+
+// Also send ready signal after a short delay to ensure everything is loaded
+setTimeout(sendReadySignal, 1000);

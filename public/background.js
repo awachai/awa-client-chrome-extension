@@ -14,6 +14,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       contentScriptTabs.add(sender.tab.id);
       console.log(`Content script ready on tab ${sender.tab.id}: ${message.url}`);
     }
+    sendResponse({ success: true });
+    return;
   }
   
   // Forward messages from side panel to content script
@@ -36,9 +38,25 @@ async function executeCommandOnActiveTab(command) {
       return { success: false, error: 'No active tab found' };
     }
     
-    // Check if content script is ready
+    console.log(`Checking tab ${activeTab.id}, content script ready:`, contentScriptTabs.has(activeTab.id));
+    
+    // If content script is not ready, try to inject it
     if (!contentScriptTabs.has(activeTab.id)) {
-      return { success: false, error: 'Content script not ready on this tab' };
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: activeTab.id },
+          files: ['content.js']
+        });
+        
+        // Wait a bit for content script to initialize
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        if (!contentScriptTabs.has(activeTab.id)) {
+          return { success: false, error: 'Content script failed to initialize' };
+        }
+      } catch (injectError) {
+        return { success: false, error: `Failed to inject content script: ${injectError.message}` };
+      }
     }
     
     // Send command to content script
@@ -54,11 +72,23 @@ async function executeCommandOnActiveTab(command) {
   }
 }
 
-// Handle tab updates
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete') {
-    // Remove from set when tab is reloaded
-    contentScriptTabs.delete(tabId);
+// Handle tab updates - reinject content script when page reloads
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && tab.url && !tab.url.startsWith('chrome://')) {
+    try {
+      // Remove from ready set
+      contentScriptTabs.delete(tabId);
+      
+      // Try to inject content script
+      await chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        files: ['content.js']
+      });
+      
+      console.log(`Content script injected on tab ${tabId}: ${tab.url}`);
+    } catch (error) {
+      console.log(`Failed to inject content script on tab ${tabId}:`, error.message);
+    }
   }
 });
 
@@ -70,4 +100,25 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 // เปิด side panel เมื่อคลิก extension icon
 chrome.action.onClicked.addListener((tab) => {
   chrome.sidePanel.open({ windowId: tab.windowId });
+});
+
+// Initialize content script on current tabs when extension starts
+chrome.runtime.onStartup.addListener(async () => {
+  try {
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+      if (tab.id && tab.url && !tab.url.startsWith('chrome://')) {
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['content.js']
+          });
+        } catch (error) {
+          console.log(`Failed to inject content script on startup for tab ${tab.id}`);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Failed to initialize content scripts on startup:', error);
+  }
 });
