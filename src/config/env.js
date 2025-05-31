@@ -40,5 +40,6 @@ export const getWebSocketUrl = (user = 'nueng') => {
 
 export const API_BASE_URL = config.API_BASE_URL;
 export const CURRENT_ENV = currentEnv;
+export { debug_mode };
 
 export default config;
