@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog";
-import { Bot, User, Send, Paperclip, Image, FileText, LogOut, X, Download, Eye } from "lucide-react";
+import { Bot, User, Send, Paperclip, Image, FileText, LogOut, X, Download, Eye, Wifi, WifiOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useWebSocket } from "../hooks/useWebSocket";
 
 interface Message {
   id: string;
@@ -45,6 +46,9 @@ const ChatPage = () => {
   const [selectedImage, setSelectedImage] = useState<{ url: string; name: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+
+  // WebSocket connection
+  const { isConnected, messages: wsMessages, error: wsError, sendMessage } = useWebSocket('nueng');
 
   // Helper function to get user initials
   const getUserInitials = (name: string) => {
@@ -88,11 +92,27 @@ const ChatPage = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    
+    // Send message via WebSocket
+    if (isConnected) {
+      const wsMessage = {
+        type: 'user_message',
+        content: inputMessage,
+        attachments: attachments.map(att => ({
+          type: att.type,
+          name: att.name
+        })),
+        timestamp: new Date().toISOString()
+      };
+      
+      sendMessage(wsMessage);
+    }
+
     setInputMessage("");
     setPendingFiles([]);
     setIsLoading(true);
 
-    // Simulate AI response
+    // Simulate AI response (remove this when real WebSocket responses are implemented)
     setTimeout(() => {
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -225,6 +245,17 @@ const ChatPage = () => {
         <div className="flex items-center space-x-2">
           <Bot className="h-6 w-6 text-blue-600" />
           <h1 className="text-lg font-semibold font-kanit">AI Agent</h1>
+          {/* WebSocket Status Indicator */}
+          <div className="flex items-center space-x-1">
+            {isConnected ? (
+              <Wifi className="h-4 w-4 text-green-500" />
+            ) : (
+              <WifiOff className="h-4 w-4 text-red-500" />
+            )}
+            <span className={`text-xs ${isConnected ? 'text-green-600' : 'text-red-600'}`}>
+              {isConnected ? 'Connected' : 'Disconnected'}
+            </span>
+          </div>
         </div>
         <div className="flex items-center space-x-2">
           <Avatar className="h-6 w-6">
@@ -238,6 +269,13 @@ const ChatPage = () => {
           </Button>
         </div>
       </div>
+
+      {/* WebSocket Error Display */}
+      {wsError && (
+        <div className="bg-red-50 border-b border-red-200 px-3 py-2">
+          <p className="text-xs text-red-600">WebSocket Error: {wsError}</p>
+        </div>
+      )}
 
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
