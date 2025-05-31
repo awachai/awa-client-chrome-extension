@@ -1,5 +1,6 @@
 import { toast } from "@/hooks/use-toast";
 import { debug_mode } from "../config/env";
+import { DOMUtils, ElementInfo } from "./domUtils";
 
 export interface TextCommand {
   type: 'text';
@@ -161,11 +162,39 @@ export class CommandHandler {
     return { success: true, action: 'ask_user', confirmed, message: command.message };
   }
 
-  private highlightElement(selector: string) {
+  private async highlightElement(selector: string) {
     try {
-      const element = document.querySelector(selector);
+      // ลองหา element ด้วยวิธีต่างๆ
+      let element = DOMUtils.findElement(selector);
+      
+      // ถ้าไม่เจอ ลองรอสักครู่
       if (!element) {
-        return { success: false, error: `Element not found: ${selector}` };
+        element = await DOMUtils.waitForElement(selector, 2000);
+      }
+      
+      if (!element) {
+        // หา elements ที่คล้ายกัน
+        const similar = DOMUtils.findSimilarElements(selector);
+        
+        return { 
+          success: false, 
+          error: `Element not found: ${selector}`,
+          suggestions: similar.length > 0 ? {
+            message: `พบ elements ที่คล้ายกัน:`,
+            elements: similar.map(el => ({
+              selector: el.selector,
+              text: el.textContent,
+              tag: el.tagName
+            }))
+          } : {
+            message: `ไม่พบ element ใดๆ ที่คล้ายกับ "${selector}"`,
+            availableElements: DOMUtils.scanInteractiveElements().slice(0, 5).map(el => ({
+              selector: el.selector,
+              text: el.textContent,
+              tag: el.tagName
+            }))
+          }
+        };
       }
 
       // Remove existing highlights
@@ -185,6 +214,7 @@ export class CommandHandler {
             outline: 3px solid #ff6b6b !important;
             outline-offset: 2px !important;
             animation: ai-pulse 2s infinite !important;
+            z-index: 9999 !important;
           }
           @keyframes ai-pulse {
             0%, 100% { outline-color: #ff6b6b; }
@@ -199,35 +229,113 @@ export class CommandHandler {
         element.classList.remove('ai-highlight');
       }, 5000);
 
-      return { success: true, action: 'highlight', selector, found: true };
+      return { 
+        success: true, 
+        action: 'highlight', 
+        selector: DOMUtils.generateSelector(element), 
+        found: true,
+        elementInfo: {
+          tag: element.tagName.toLowerCase(),
+          text: element.textContent?.substring(0, 100),
+          isInteractable: DOMUtils.isInteractable(element)
+        }
+      };
     } catch (error) {
       return { success: false, error: `Failed to highlight ${selector}: ${error}` };
     }
   }
 
-  private clickElement(selector: string) {
+  private async clickElement(selector: string) {
     try {
-      const element = document.querySelector(selector) as HTMLElement;
+      // ลองหา element ด้วยวิธีต่างๆ
+      let element = DOMUtils.findElement(selector);
+      
+      // ถ้าไม่เจอ ลองรอสักครู่
       if (!element) {
-        return { success: false, error: `Element not found: ${selector}` };
+        element = await DOMUtils.waitForElement(selector, 2000);
       }
 
-      element.click();
-      return { success: true, action: 'click', selector, clicked: true };
+      if (!element) {
+        // หา elements ที่คล้ายกัน
+        const similar = DOMUtils.findSimilarElements(selector);
+        
+        return { 
+          success: false, 
+          error: `Element not found: ${selector}`,
+          suggestions: similar.length > 0 ? {
+            message: `พบ elements ที่คล้ายกัน:`,
+            elements: similar.map(el => ({
+              selector: el.selector,
+              text: el.textContent,
+              tag: el.tagName
+            }))
+          } : {
+            message: `ไม่พบ element ใดๆ ที่คล้ายกับ "${selector}"`,
+            availableElements: DOMUtils.scanInteractiveElements().slice(0, 5).map(el => ({
+              selector: el.selector,
+              text: el.textContent,
+              tag: el.tagName
+            }))
+          }
+        };
+      }
+
+      // ตรวจสอบว่า element สามารถคลิกได้หรือไม่
+      if (!DOMUtils.isInteractable(element)) {
+        return { 
+          success: false, 
+          error: `Element "${selector}" is not interactable`,
+          elementInfo: {
+            tag: element.tagName.toLowerCase(),
+            text: element.textContent?.substring(0, 100),
+            isVisible: element.getBoundingClientRect().width > 0
+          }
+        };
+      }
+
+      // Scroll to element ก่อนคลิก
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      
+      // รอให้ scroll เสร็จ
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // คลิก element
+      (element as HTMLElement).click();
+      
+      return { 
+        success: true, 
+        action: 'click', 
+        selector: DOMUtils.generateSelector(element), 
+        clicked: true,
+        elementInfo: {
+          tag: element.tagName.toLowerCase(),
+          text: element.textContent?.substring(0, 100)
+        }
+      };
     } catch (error) {
       return { success: false, error: `Failed to click ${selector}: ${error}` };
     }
   }
 
-  private scrollToElement(selector: string) {
+  private async scrollToElement(selector: string) {
     try {
-      const element = document.querySelector(selector);
+      let element = DOMUtils.findElement(selector);
+      
+      if (!element) {
+        element = await DOMUtils.waitForElement(selector, 2000);
+      }
+      
       if (!element) {
         return { success: false, error: `Element not found: ${selector}` };
       }
 
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return { success: true, action: 'scroll_to', selector, scrolled: true };
+      return { 
+        success: true, 
+        action: 'scroll_to', 
+        selector: DOMUtils.generateSelector(element), 
+        scrolled: true 
+      };
     } catch (error) {
       return { success: false, error: `Failed to scroll to ${selector}: ${error}` };
     }
