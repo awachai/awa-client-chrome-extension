@@ -31,6 +31,7 @@ const getCurrentEnvironment = () => {
 //const currentEnv = getCurrentEnvironment();
 const currentEnv = "local"; // fix
 const config = environments[currentEnv];
+const debug_mode = true;
 
 // WebSocket URL with user parameter
 export const getWebSocketUrl = (user = 'nueng') => {
