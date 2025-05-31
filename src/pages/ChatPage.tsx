@@ -47,8 +47,8 @@ const ChatPage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
-  // WebSocket connection
-  const { isConnected, messages: wsMessages, error: wsError, sendMessage } = useWebSocket('nueng');
+  // WebSocket connection with retry functionality
+  const { isConnected, messages: wsMessages, error: wsError, sendMessage, retry, clearError } = useWebSocket('nueng');
 
   // Helper function to get user initials
   const getUserInitials = (name: string) => {
@@ -93,7 +93,7 @@ const ChatPage = () => {
 
     setMessages(prev => [...prev, userMessage]);
     
-    // Send message via WebSocket
+    // Send message via WebSocket only if connected
     if (isConnected) {
       const wsMessage = {
         type: 'user_message',
@@ -105,7 +105,10 @@ const ChatPage = () => {
         timestamp: new Date().toISOString()
       };
       
-      sendMessage(wsMessage);
+      const sent = sendMessage(wsMessage);
+      if (!sent) {
+        console.warn('Failed to send message via WebSocket');
+      }
     }
 
     setInputMessage("");
@@ -117,7 +120,7 @@ const ChatPage = () => {
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'ai',
-        content: `ได้รับคำสั่ง: "${inputMessage}" ${attachments.length > 0 ? `และไฟล์ ${attachments.length} ไฟล์` : ''} กำลังดำเนินการ... ผมจะช่วยคุณทำงานนี้ในบราวเซอร์`,
+        content: `ได้รับคำสั่ง: "${inputMessage}" ${attachments.length > 0 ? `และไฟล์ ${attachments.length} ไฟล์` : ''} ${isConnected ? 'ส่งผ่าน WebSocket แล้ว' : '(WebSocket ไม่เชื่อมต่อ)'}`,
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, aiMessage]);
@@ -270,10 +273,30 @@ const ChatPage = () => {
         </div>
       </div>
 
-      {/* WebSocket Error Display */}
+      {/* WebSocket Error Display with Retry */}
       {wsError && (
         <div className="bg-red-50 border-b border-red-200 px-3 py-2">
-          <p className="text-xs text-red-600">WebSocket Error: {wsError}</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-red-600 flex-1">{wsError}</p>
+            <div className="flex space-x-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={retry}
+                className="text-xs px-2 py-1 h-auto"
+              >
+                Retry
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={clearError}
+                className="text-xs px-2 py-1 h-auto"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
