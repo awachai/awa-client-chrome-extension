@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,6 +52,7 @@ const ChatPage = () => {
   const [selectedImage, setSelectedImage] = useState<{ url: string; name: string } | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ message: string; resolve: (confirmed: boolean) => void } | null>(null);
   const [debugMode, setDebugMode] = useState(false);
+  const [processedMessageIds, setProcessedMessageIds] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -116,6 +118,18 @@ const ChatPage = () => {
   React.useEffect(() => {
     if (wsMessages.length > 0) {
       const latestMessage = wsMessages[wsMessages.length - 1];
+      
+      // สร้าง unique ID สำหรับ message เพื่อป้องกันการประมวลผลซ้ำ
+      const messageId = `${Date.now()}-${JSON.stringify(latestMessage)}`;
+      
+      // ตรวจสอบว่าประมวลผล message นี้แล้วหรือยัง
+      if (processedMessageIds.has(messageId)) {
+        return;
+      }
+      
+      // เพิ่ม messageId เข้าไปใน Set
+      setProcessedMessageIds(prev => new Set([...prev, messageId]));
+      
       console.log('Processing WebSocket message:', latestMessage);
       
       try {
