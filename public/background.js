@@ -5,6 +5,9 @@ console.log('AI Web Agent Background Script loaded');
 // เก็บข้อมูล tabs ที่มี content script พร้อมใช้งาน
 const readyTabs = new Map();
 
+// เก็บข้อมูล pending script injections
+const pendingInjections = new Set();
+
 // Listen for messages from content scripts and extension
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('Background received message:', message.type, message);
@@ -19,6 +22,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         timestamp: message.timestamp
       });
       console.log(`Content script ready on tab ${sender.tab.id}: ${message.url}`);
+      
+      // Remove from pending injections if exists
+      pendingInjections.delete(sender.tab.id);
     }
     sendResponse({ success: true, message: 'Ready signal received' });
     return;
@@ -73,24 +79,54 @@ async function executeCommandOnActiveTab(command) {
     if (!tabInfo || !tabInfo.ready) {
       console.log(`Injecting content script on tab ${activeTab.id}`);
       
-      try {
-        await chrome.scripting.executeScript({
-          target: { tabId: activeTab.id },
-          files: ['content.js']
-        });
-        
-        // Wait for content script to initialize
-        console.log('Waiting for content script to initialize...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Check if it's ready now
-        const updatedTabInfo = readyTabs.get(activeTab.id);
-        if (!updatedTabInfo || !updatedTabInfo.ready) {
-          return { success: false, error: 'Content script failed to initialize after injection' };
+      // Check if injection is already pending
+      if (pendingInjections.has(activeTab.id)) {
+        console.log('Injection already pending for this tab, waiting...');
+        // Wait for pending injection to complete
+        let attempts = 0;
+        while (pendingInjections.has(activeTab.id) && attempts < 30) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
         }
-      } catch (injectError) {
-        console.error('Failed to inject content script:', injectError);
-        return { success: false, error: `Failed to inject content script: ${injectError.message}` };
+      } else {
+        // Add to pending injections
+        pendingInjections.add(activeTab.id);
+        
+        try {
+          // Clear any existing ready state
+          readyTabs.delete(activeTab.id);
+          
+          await chrome.scripting.executeScript({
+            target: { tabId: activeTab.id },
+            files: ['content.js']
+          });
+          
+          // Wait for content script to initialize
+          console.log('Waiting for content script to initialize...');
+          let initAttempts = 0;
+          while (initAttempts < 50) { // 5 seconds total
+            await new Promise(resolve => setTimeout(resolve, 100));
+            const updatedTabInfo = readyTabs.get(activeTab.id);
+            if (updatedTabInfo && updatedTabInfo.ready) {
+              console.log('Content script initialized successfully');
+              break;
+            }
+            initAttempts++;
+          }
+          
+          // Remove from pending
+          pendingInjections.delete(activeTab.id);
+          
+          // Check if it's ready now
+          const finalTabInfo = readyTabs.get(activeTab.id);
+          if (!finalTabInfo || !finalTabInfo.ready) {
+            return { success: false, error: 'Content script failed to initialize after injection' };
+          }
+        } catch (injectError) {
+          pendingInjections.delete(activeTab.id);
+          console.error('Failed to inject content script:', injectError);
+          return { success: false, error: `Failed to inject content script: ${injectError.message}` };
+        }
       }
     }
     
@@ -125,24 +161,17 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     
     // Mark as not ready since page reloaded
     readyTabs.delete(tabId);
+    pendingInjections.delete(tabId);
     
-    try {
-      // Inject content script
-      await chrome.scripting.executeScript({
-        target: { tabId: tabId },
-        files: ['content.js']
-      });
-      
-      console.log(`Content script injected on tab ${tabId}`);
-    } catch (error) {
-      console.log(`Failed to inject content script on tab ${tabId}:`, error.message);
-    }
+    // Don't auto-inject, wait for command execution to trigger injection
+    console.log(`Tab ${tabId} ready for content script injection when needed`);
   }
 });
 
 // Handle tab removal
 chrome.tabs.onRemoved.addListener((tabId) => {
   readyTabs.delete(tabId);
+  pendingInjections.delete(tabId);
   console.log(`Tab ${tabId} removed from ready list`);
 });
 
@@ -158,38 +187,17 @@ chrome.action.onClicked.addListener(async (tab) => {
 
 // Initialize on startup
 chrome.runtime.onStartup.addListener(async () => {
-  console.log('Extension startup - initializing content scripts');
-  await initializeAllTabs();
+  console.log('Extension startup - clearing ready tabs');
+  readyTabs.clear();
+  pendingInjections.clear();
 });
 
 // Initialize on install
 chrome.runtime.onInstalled.addListener(async () => {
-  console.log('Extension installed/updated - initializing content scripts');
-  await initializeAllTabs();
+  console.log('Extension installed/updated - clearing ready tabs');
+  readyTabs.clear();
+  pendingInjections.clear();
 });
 
-// Function to initialize content scripts on all tabs
-async function initializeAllTabs() {
-  try {
-    const tabs = await chrome.tabs.query({});
-    console.log(`Initializing content scripts on ${tabs.length} tabs`);
-    
-    for (const tab of tabs) {
-      if (tab.id && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
-        try {
-          await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            files: ['content.js']
-          });
-          console.log(`Content script initialized on tab ${tab.id}: ${tab.url}`);
-        } catch (error) {
-          console.log(`Failed to initialize content script on tab ${tab.id}: ${error.message}`);
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Failed to initialize content scripts on startup:', error);
-  }
-}
-
 console.log('Background script initialization complete');
+
