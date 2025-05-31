@@ -1,5 +1,5 @@
-
 import { toast } from "@/hooks/use-toast";
+import { debug_mode } from "../config/env";
 
 export interface TextCommand {
   type: 'text';
@@ -33,20 +33,35 @@ export class CommandHandler {
   private onTextMessage?: (message: string) => void;
   private onImageReceived?: (imageUrl: string) => void;
   private onConfirmRequest?: (message: string) => Promise<boolean>;
+  private onDebugMessage?: (message: string) => void;
 
   constructor(callbacks: {
     onTextMessage?: (message: string) => void;
     onImageReceived?: (imageUrl: string) => void;
     onConfirmRequest?: (message: string) => Promise<boolean>;
+    onDebugMessage?: (message: string) => void;
   }) {
     this.onTextMessage = callbacks.onTextMessage;
     this.onImageReceived = callbacks.onImageReceived;
     this.onConfirmRequest = callbacks.onConfirmRequest;
+    this.onDebugMessage = callbacks.onDebugMessage;
   }
 
   async executeCommand(command: WebSocketCommand): Promise<any> {
     console.log('Executing command:', command);
 
+    const result = await this._executeCommandInternal(command);
+    
+    // Send debug message if debug mode is enabled
+    if (debug_mode && this.onDebugMessage) {
+      const debugMessage = this.formatDebugMessage(command, result);
+      this.onDebugMessage(debugMessage);
+    }
+
+    return result;
+  }
+
+  private async _executeCommandInternal(command: WebSocketCommand): Promise<any> {
     switch (command.type) {
       case 'text':
         return this.handleTextCommand(command);
@@ -64,6 +79,32 @@ export class CommandHandler {
         console.warn('Unknown command type:', command);
         return { success: false, error: 'Unknown command type' };
     }
+  }
+
+  private formatDebugMessage(command: WebSocketCommand, result: any): string {
+    const timestamp = new Date().toLocaleTimeString('th-TH');
+    let message = `[DEBUG ${timestamp}] `;
+    
+    if (command.type === 'text') {
+      message += `ส่งข้อความ: "${command.message}"`;
+    } else if (command.type === 'command') {
+      message += `คำสั่ง: ${command.action}`;
+      if (command.selector) {
+        message += ` (${command.selector})`;
+      }
+    } else if (command.type === 'image') {
+      message += `แสดงรูปภาพ`;
+    } else if (command.type === 'confirm') {
+      message += `ถามผู้ใช้: "${command.message}"`;
+    }
+    
+    if (result.success) {
+      message += ` ✅ สำเร็จ`;
+    } else {
+      message += ` ❌ ผิดพลาด: ${result.error}`;
+    }
+    
+    return message;
   }
 
   private handleTextCommand(command: TextCommand) {

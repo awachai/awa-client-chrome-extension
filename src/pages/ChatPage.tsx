@@ -77,6 +77,15 @@ const ChatPage = () => {
       return new Promise<boolean>((resolve) => {
         setConfirmDialog({ message, resolve });
       });
+    },
+    onDebugMessage: (message: string) => {
+      const debugMessage: Message = {
+        id: Date.now().toString(),
+        type: 'ai',
+        content: message,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, debugMessage]);
     }
   });
 
