@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -119,8 +118,8 @@ const ChatPage = () => {
     if (wsMessages.length > 0) {
       const latestMessage = wsMessages[wsMessages.length - 1];
       
-      // สร้าง unique ID สำหรับ message เพื่อป้องกันการประมวลผลซ้ำ
-      const messageId = `${Date.now()}-${JSON.stringify(latestMessage)}`;
+      // สร้าง unique ID สำหรับ message จากเนื้อหาของ message แทน timestamp
+      const messageId = JSON.stringify(latestMessage);
       
       // ตรวจสอบว่าประมวลผล message นี้แล้วหรือยัง
       if (processedMessageIds.has(messageId)) {
@@ -216,7 +215,7 @@ const ChatPage = () => {
         });
       }
     }
-  }, [wsMessages, debugMode, commandHandler, toast]);
+  }, [wsMessages, debugMode, commandHandler, toast, processedMessageIds]);
 
   // Helper function to get user initials
   const getUserInitials = (name: string) => {
