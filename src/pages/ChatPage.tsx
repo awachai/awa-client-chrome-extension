@@ -119,44 +119,16 @@ const ChatPage = () => {
       console.log('Processing WebSocket message:', latestMessage);
       
       try {
+        let jsonCommand = null;
+        let isJsonMessage = false;
+        
         // Check if message is a string that looks like JSON
         if (typeof latestMessage === 'string') {
           const { isJson, parsed } = tryParseJSON(latestMessage);
           
           if (isJson) {
-            // Handle JSON command from server
-            if (debugMode) {
-              const debugMessage: Message = {
-                id: Date.now().toString(),
-                type: 'debug',
-                content: `🔍 ได้รับคำสั่ง JSON จากเซิฟเวอร์: ${JSON.stringify(parsed, null, 2)}`,
-                timestamp: new Date(),
-              };
-              setMessages(prev => [...prev, debugMessage]);
-            }
-
-            commandHandler.executeCommand(parsed as WebSocketCommand).then(result => {
-              console.log('Server JSON command execution result:', result);
-              
-              const resultMessage: Message = {
-                id: Date.now().toString(),
-                type: 'ai',
-                content: `✅ ดำเนินการคำสั่ง JSON จากเซิฟเวอร์สำเร็จ: ${parsed.action || parsed.type}`,
-                timestamp: new Date(),
-                commandResult: result,
-                isJson: true,
-                jsonCommand: parsed
-              };
-              setMessages(prev => [...prev, resultMessage]);
-            }).catch(error => {
-              const errorMessage: Message = {
-                id: Date.now().toString(),
-                type: 'ai',
-                content: `❌ เกิดข้อผิดพลาดในการดำเนินการคำสั่ง JSON จากเซิฟเวอร์: ${error}`,
-                timestamp: new Date(),
-              };
-              setMessages(prev => [...prev, errorMessage]);
-            });
+            jsonCommand = parsed;
+            isJsonMessage = true;
           } else {
             // Handle regular text message from server
             const aiMessage: Message = {
@@ -166,45 +138,63 @@ const ChatPage = () => {
               timestamp: new Date(),
             };
             setMessages(prev => [...prev, aiMessage]);
+            return;
           }
         } 
         // Check if message is already a parsed object (JSON command)
         else if (typeof latestMessage === 'object' && latestMessage !== null) {
+          jsonCommand = latestMessage;
+          isJsonMessage = true;
+        }
+        
+        // If we have a JSON command, process it
+        if (isJsonMessage && jsonCommand) {
           if (debugMode) {
             const debugMessage: Message = {
               id: Date.now().toString(),
               type: 'debug',
-              content: `🔍 ได้รับคำสั่ง JSON object จากเซิฟเวอร์: ${JSON.stringify(latestMessage, null, 2)}`,
+              content: `🔍 ได้รับคำสั่ง JSON จากเซิฟเวอร์: ${JSON.stringify(jsonCommand, null, 2)}`,
               timestamp: new Date(),
             };
             setMessages(prev => [...prev, debugMessage]);
           }
 
-          commandHandler.executeCommand(latestMessage as WebSocketCommand).then(result => {
-            console.log('Server JSON object command execution result:', result);
+          // Execute the command
+          commandHandler.executeCommand(jsonCommand as WebSocketCommand).then(result => {
+            console.log('Server JSON command execution result:', result);
             
             const resultMessage: Message = {
-              id: Date.now().toString(),
+              id: (Date.now() + 1).toString(),
               type: 'ai',
-              content: `✅ ดำเนินการคำสั่ง JSON object จากเซิฟเวอร์สำเร็จ: ${latestMessage.action || latestMessage.type}`,
+              content: `✅ ดำเนินการคำสั่ง JSON จากเซิฟเวอร์สำเร็จ: ${jsonCommand.action || jsonCommand.type}`,
               timestamp: new Date(),
               commandResult: result,
               isJson: true,
-              jsonCommand: latestMessage
+              jsonCommand: jsonCommand
             };
             setMessages(prev => [...prev, resultMessage]);
           }).catch(error => {
+            console.error('Command execution error:', error);
             const errorMessage: Message = {
-              id: Date.now().toString(),
+              id: (Date.now() + 1).toString(),
               type: 'ai',
-              content: `❌ เกิดข้อผิดพลาดในการดำเนินการคำสั่ง JSON object จากเซิฟเวอร์: ${error}`,
+              content: `❌ เกิดข้อผิดพลาดในการดำเนินการคำสั่ง JSON จากเซิฟเวอร์: ${error.message || error}`,
               timestamp: new Date(),
             };
             setMessages(prev => [...prev, errorMessage]);
           });
         }
+        
       } catch (error) {
         console.error('Error processing WebSocket message:', error);
+        const errorMessage: Message = {
+          id: Date.now().toString(),
+          type: 'ai',
+          content: `❌ เกิดข้อผิดพลาดในการประมวลผลข้อความจากเซิฟเวอร์: ${error.message || error}`,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, errorMessage]);
+        
         toast({
           title: "Message Processing Error",
           description: "Failed to process message from server",
@@ -212,7 +202,7 @@ const ChatPage = () => {
         });
       }
     }
-  }, [wsMessages, debugMode]);
+  }, [wsMessages, debugMode, commandHandler, toast]);
 
   // Helper function to get user initials
   const getUserInitials = (name: string) => {
