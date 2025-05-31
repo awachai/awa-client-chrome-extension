@@ -15,6 +15,28 @@ export class ChromeExtensionHandler {
                               typeof (window as any).chrome !== 'undefined' && 
                               (window as any).chrome.runtime && 
                               (window as any).chrome.runtime.id;
+
+    // ส่งสัญญาณไปยัง background script ว่า side panel เปิดแล้ว
+    if (this.isExtensionContext) {
+      this.notifySidePanelOpened();
+    }
+  }
+
+  private async notifySidePanelOpened() {
+    try {
+      const chrome = (window as any).chrome;
+      chrome.runtime.sendMessage({
+        type: 'SIDE_PANEL_OPENED'
+      }, (response: any) => {
+        if (chrome.runtime.lastError) {
+          console.log('Failed to send side panel opened signal:', chrome.runtime.lastError.message);
+        } else {
+          console.log('Side panel opened signal sent successfully');
+        }
+      });
+    } catch (error) {
+      console.error('Error sending side panel opened signal:', error);
+    }
   }
 
   async executeCommand(command: ChromeCommand): Promise<any> {

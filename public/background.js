@@ -5,6 +5,9 @@ console.log('AI Web Agent Background Script loaded');
 // เก็บข้อมูล tabs ที่มี content script พร้อมใช้งาน
 const readyTabs = new Map();
 
+// เก็บ tab ID ที่มี side panel เปิดอยู่
+let sidePanelTabId = null;
+
 // Listen for messages from content scripts and extension
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('Background received message:', message.type, message);
@@ -24,9 +27,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return;
   }
   
+  // Side panel opened signal
+  if (message.type === 'SIDE_PANEL_OPENED') {
+    if (sender.tab) {
+      sidePanelTabId = sender.tab.id;
+      console.log(`Side panel opened on tab ${sidePanelTabId}`);
+    }
+    sendResponse({ success: true });
+    return;
+  }
+  
   // Execute DOM command
   if (message.type === 'EXECUTE_DOM_COMMAND') {
-    executeCommandOnActiveTab(message.command)
+    executeCommandOnTargetTab(message.command)
       .then(result => {
         console.log('Command execution result:', result);
         sendResponse(result);
@@ -46,41 +59,58 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-// Execute command on active tab with improved error handling
-async function executeCommandOnActiveTab(command) {
+// Execute command on target tab (side panel tab หรือ active tab)
+async function executeCommandOnTargetTab(command) {
   try {
-    console.log('Executing command on active tab:', command);
+    console.log('Executing command on target tab:', command);
     
-    // Get active tab
-    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    let targetTab = null;
     
-    if (!activeTab || !activeTab.id) {
-      return { success: false, error: 'No active tab found' };
+    // ลองใช้ side panel tab ก่อน
+    if (sidePanelTabId) {
+      try {
+        targetTab = await chrome.tabs.get(sidePanelTabId);
+        console.log(`Using side panel tab: ${targetTab.id}, URL: ${targetTab.url}`);
+      } catch (error) {
+        console.log(`Side panel tab ${sidePanelTabId} no longer exists, clearing...`);
+        sidePanelTabId = null;
+      }
+    }
+    
+    // ถ้าไม่มี side panel tab หรือไม่สามารถใช้ได้ ใช้ active tab
+    if (!targetTab) {
+      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      targetTab = activeTab;
+      console.log(`Using active tab: ${targetTab?.id}, URL: ${targetTab?.url}`);
+    }
+    
+    if (!targetTab || !targetTab.id) {
+      return { success: false, error: 'No target tab found' };
     }
 
-    console.log(`Active tab: ${activeTab.id}, URL: ${activeTab.url}`);
+    console.log(`Target tab: ${targetTab.id}, URL: ${targetTab.url}`);
     
     // Check if URL is accessible
-    if (!activeTab.url || activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('chrome-extension://')) {
+    if (!targetTab.url || targetTab.url.startsWith('chrome://') || targetTab.url.startsWith('chrome-extension://')) {
       return { success: false, error: 'Cannot access this type of page' };
     }
     
     // Check if content script is ready
-    const tabInfo = readyTabs.get(activeTab.id);
-    console.log(`Tab ${activeTab.id} ready status:`, tabInfo);
+    const tabInfo = readyTabs.get(targetTab.id);
+    console.log(`Tab ${targetTab.id} ready status:`, tabInfo);
     
     // If not ready, inject content script
     if (!tabInfo || !tabInfo.ready) {
-      console.log(`Injecting content script on tab ${activeTab.id}`);
+      console.log(`Injecting content script on tab ${targetTab.id}`);
       
       try {
         // Clear any existing ready state
-        readyTabs.delete(activeTab.id);
+        readyTabs.delete(targetTab.id);
         
         // First, try to check if content script is already there
         try {
           const response = await new Promise((resolve, reject) => {
-            chrome.tabs.sendMessage(activeTab.id, { type: 'PING' }, (response) => {
+            chrome.tabs.sendMessage(targetTab.id, { type: 'PING' }, (response) => {
               if (chrome.runtime.lastError) {
                 reject(chrome.runtime.lastError);
               } else {
@@ -91,10 +121,10 @@ async function executeCommandOnActiveTab(command) {
           
           if (response && response.pong) {
             console.log('Content script already exists, marking as ready');
-            readyTabs.set(activeTab.id, {
+            readyTabs.set(targetTab.id, {
               ready: true,
-              url: activeTab.url,
-              title: activeTab.title,
+              url: targetTab.url,
+              title: targetTab.title,
               timestamp: new Date().toISOString()
             });
           }
@@ -103,7 +133,7 @@ async function executeCommandOnActiveTab(command) {
           console.log('Content script not responding, injecting...');
           
           await chrome.scripting.executeScript({
-            target: { tabId: activeTab.id },
+            target: { tabId: targetTab.id },
             files: ['content.js']
           });
           
@@ -112,7 +142,7 @@ async function executeCommandOnActiveTab(command) {
           let initAttempts = 0;
           while (initAttempts < 30) { // 3 seconds total
             await new Promise(resolve => setTimeout(resolve, 100));
-            const updatedTabInfo = readyTabs.get(activeTab.id);
+            const updatedTabInfo = readyTabs.get(targetTab.id);
             if (updatedTabInfo && updatedTabInfo.ready) {
               console.log('Content script initialized successfully');
               break;
@@ -122,7 +152,7 @@ async function executeCommandOnActiveTab(command) {
         }
         
         // Check if it's ready now
-        const finalTabInfo = readyTabs.get(activeTab.id);
+        const finalTabInfo = readyTabs.get(targetTab.id);
         if (!finalTabInfo || !finalTabInfo.ready) {
           return { success: false, error: 'Content script failed to initialize after injection' };
         }
@@ -133,10 +163,10 @@ async function executeCommandOnActiveTab(command) {
     }
     
     // Send command to content script
-    console.log(`Sending command to tab ${activeTab.id}:`, command);
+    console.log(`Sending command to tab ${targetTab.id}:`, command);
     
     return new Promise((resolve) => {
-      chrome.tabs.sendMessage(activeTab.id, {
+      chrome.tabs.sendMessage(targetTab.id, {
         type: 'DOM_COMMAND',
         command: command
       }, (response) => {
@@ -171,6 +201,13 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 // Handle tab removal
 chrome.tabs.onRemoved.addListener((tabId) => {
   readyTabs.delete(tabId);
+  
+  // Clear side panel tab ID if it's the one being removed
+  if (sidePanelTabId === tabId) {
+    sidePanelTabId = null;
+    console.log('Side panel tab removed, clearing sidePanelTabId');
+  }
+  
   console.log(`Tab ${tabId} removed from ready list`);
 });
 
@@ -178,7 +215,8 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 chrome.action.onClicked.addListener(async (tab) => {
   try {
     await chrome.sidePanel.open({ windowId: tab.windowId });
-    console.log('Side panel opened');
+    sidePanelTabId = tab.id;
+    console.log(`Side panel opened on tab ${tab.id}`);
   } catch (error) {
     console.error('Failed to open side panel:', error);
   }
@@ -186,14 +224,16 @@ chrome.action.onClicked.addListener(async (tab) => {
 
 // Initialize on startup
 chrome.runtime.onStartup.addListener(async () => {
-  console.log('Extension startup - clearing ready tabs');
+  console.log('Extension startup - clearing ready tabs and side panel tab');
   readyTabs.clear();
+  sidePanelTabId = null;
 });
 
 // Initialize on install
 chrome.runtime.onInstalled.addListener(async () => {
-  console.log('Extension installed/updated - clearing ready tabs');
+  console.log('Extension installed/updated - clearing ready tabs and side panel tab');
   readyTabs.clear();
+  sidePanelTabId = null;
 });
 
 console.log('Background script initialization complete');
