@@ -1,6 +1,7 @@
 import { toast } from "@/hooks/use-toast";
 import { debug_mode } from "../config/env";
 import { DOMUtils, ElementInfo } from "./domUtils";
+import { ChromeExtensionHandler } from "./chromeExtensionHandler";
 
 export interface TextCommand {
   type: 'text';
@@ -35,6 +36,7 @@ export class CommandHandler {
   private onImageReceived?: (imageUrl: string) => void;
   private onConfirmRequest?: (message: string) => Promise<boolean>;
   private onDebugMessage?: (message: string) => void;
+  private chromeHandler: ChromeExtensionHandler;
 
   constructor(callbacks: {
     onTextMessage?: (message: string) => void;
@@ -46,6 +48,7 @@ export class CommandHandler {
     this.onImageReceived = callbacks.onImageReceived;
     this.onConfirmRequest = callbacks.onConfirmRequest;
     this.onDebugMessage = callbacks.onDebugMessage;
+    this.chromeHandler = new ChromeExtensionHandler();
   }
 
   async executeCommand(command: WebSocketCommand): Promise<any> {
@@ -117,6 +120,55 @@ export class CommandHandler {
   }
 
   private async handleCommandAction(command: CommandAction) {
+    // ใช้ Chrome Extension หากพร้อมใช้งาน
+    if (this.chromeHandler.isReady()) {
+      return this.executeCommandViaExtension(command);
+    }
+    
+    // Fallback ไปใช้ DOM Utils แบบเดิม
+    return this.executeCommandViaDOMUtils(command);
+  }
+
+  private async executeCommandViaExtension(command: CommandAction) {
+    switch (command.action) {
+      case 'highlight':
+        return this.chromeHandler.executeCommand({
+          action: 'highlight',
+          selector: command.selector!
+        });
+      
+      case 'click':
+        return this.chromeHandler.executeCommand({
+          action: 'click',
+          selector: command.selector!
+        });
+      
+      case 'scroll_to':
+        return this.chromeHandler.executeCommand({
+          action: 'scroll_to',
+          selector: command.selector!
+        });
+      
+      case 'get_dom':
+        return this.chromeHandler.executeCommand({
+          action: 'get_dom'
+        });
+      
+      case 'fill_form':
+        return this.chromeHandler.executeCommand({
+          action: 'fill_form',
+          data: command.data!
+        });
+      
+      case 'popup':
+        return this.showPopup(command.message!);
+      
+      default:
+        return { success: false, error: `Unknown action: ${command.action}` };
+    }
+  }
+
+  private async executeCommandViaDOMUtils(command: CommandAction) {
     switch (command.action) {
       case 'highlight':
         return this.highlightElement(command.selector!);
