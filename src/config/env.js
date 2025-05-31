@@ -28,7 +28,8 @@ const getCurrentEnvironment = () => {
   }
 };
 
-const currentEnv = getCurrentEnvironment();
+//const currentEnv = getCurrentEnvironment();
+const currentEnv = "local"; // fix
 const config = environments[currentEnv];
 
 // WebSocket URL with user parameter
