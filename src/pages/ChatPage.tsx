@@ -176,18 +176,22 @@ const ChatPage = () => {
           commandHandler.executeCommand(jsonCommand as WebSocketCommand).then(result => {
             console.log('Server JSON command execution result:', result);
             
-            const resultMessage: Message = {
-              id: (Date.now() + 1).toString(),
-              type: 'ai',
-              content: `✅ ดำเนินการคำสั่ง JSON จากเซิฟเวอร์สำเร็จ: ${jsonCommand.action || jsonCommand.type}`,
-              timestamp: new Date(),
-              commandResult: result,
-              isJson: true,
-              jsonCommand: jsonCommand
-            };
-            setMessages(prev => [...prev, resultMessage]);
+            // Only show success message in debug mode
+            if (debugMode) {
+              const resultMessage: Message = {
+                id: (Date.now() + 1).toString(),
+                type: 'ai',
+                content: `✅ ดำเนินการคำสั่ง JSON จากเซิฟเวอร์สำเร็จ: ${jsonCommand.action || jsonCommand.type}`,
+                timestamp: new Date(),
+                commandResult: result,
+                isJson: true,
+                jsonCommand: jsonCommand
+              };
+              setMessages(prev => [...prev, resultMessage]);
+            }
           }).catch(error => {
             console.error('Command execution error:', error);
+            // Show error messages even when not in debug mode
             const errorMessage: Message = {
               id: (Date.now() + 1).toString(),
               type: 'ai',
@@ -279,16 +283,20 @@ const ChatPage = () => {
       try {
         const result = await commandHandler.executeCommand(parsed as WebSocketCommand);
         
-        const resultMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          type: 'ai',
-          content: `✅ ดำเนินการคำสั่ง JSON สำเร็จ: ${parsed.action || parsed.type}`,
-          timestamp: new Date(),
-          commandResult: result
-        };
-        setMessages(prev => [...prev, resultMessage]);
+        // Only show success message in debug mode
+        if (debugMode) {
+          const resultMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            type: 'ai',
+            content: `✅ ดำเนินการคำสั่ง JSON สำเร็จ: ${parsed.action || parsed.type}`,
+            timestamp: new Date(),
+            commandResult: result
+          };
+          setMessages(prev => [...prev, resultMessage]);
+        }
         
       } catch (error) {
+        // Show error messages even when not in debug mode
         const errorMessage: Message = {
           id: (Date.now() + 1).toString(),
           type: 'ai',
