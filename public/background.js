@@ -55,66 +55,63 @@ function removeTab(tabId) {
   }
 }
 
-// Execute command on target tab (side panel tab เป็นหลัก)
-async function executeCommandOnTargetTab(command) {
+// Execute command on target tab (ONLY side panel tab, no fallback)
+async function executeCommandOnTargetTab(command, requestSidePanelTabId = null) {
   try {
-    const debugTabId = sidePanelTabId || null;
-    logToContent(debugTabId, '=== EXECUTE COMMAND DEBUG ===');
-    logToContent(debugTabId, `Command: ${JSON.stringify(command)}`);
-    logToContent(debugTabId, `Current side panel tab ID: ${sidePanelTabId}`);
-    logToContent(debugTabId, `Available ready tabs: ${Array.from(readyTabs.keys()).join(', ')}`);
+    // ใช้ tab ID ที่ส่งมาจาก request ก่อน
+    const targetTabId = requestSidePanelTabId || sidePanelTabId;
+    
+    logToContent(targetTabId, '=== EXECUTE COMMAND DEBUG ===');
+    logToContent(targetTabId, `Command: ${JSON.stringify(command)}`);
+    logToContent(targetTabId, `Request side panel tab ID: ${requestSidePanelTabId}`);
+    logToContent(targetTabId, `Stored side panel tab ID: ${sidePanelTabId}`);
+    logToContent(targetTabId, `Final target tab ID: ${targetTabId}`);
+    logToContent(targetTabId, `Available ready tabs: ${Array.from(readyTabs.keys()).join(', ')}`);
+    
+    // ตรวจสอบว่ามี side panel tab หรือไม่
+    if (!targetTabId) {
+      logToContent(null, '✗ No side panel tab ID available');
+      return { 
+        success: false, 
+        error: 'No side panel tab active. User may have closed the panel or switched window.' 
+      };
+    }
     
     let targetTab = null;
     
-    // ใช้ side panel tab เป็นหลัก
-    if (sidePanelTabId) {
-      try {
-        targetTab = await chrome.tabs.get(sidePanelTabId);
-        logToContent(sidePanelTabId, `✓ Side panel tab found - ID: ${targetTab.id}, Window: ${targetTab.windowId}, URL: ${targetTab.url}`);
-        
-        // ตรวจสอบว่า tab ยังมีอยู่และเข้าถึงได้
-        if (!targetTab.url || targetTab.url.startsWith('chrome://') || targetTab.url.startsWith('chrome-extension://')) {
-          logToContent(sidePanelTabId, `✗ Side panel tab ${sidePanelTabId} is not accessible, will try active tab`);
-          targetTab = null;
-          sidePanelTabId = null;
-        }
-      } catch (error) {
-        logToContent(debugTabId, `✗ Side panel tab ${sidePanelTabId} no longer exists: ${error.message}`);
+    // ตรวจสอบว่า tab ยังมีอยู่และเข้าถึงได้
+    try {
+      targetTab = await chrome.tabs.get(targetTabId);
+      logToContent(targetTabId, `✓ Side panel tab found - ID: ${targetTab.id}, Window: ${targetTab.windowId}, URL: ${targetTab.url}`);
+      
+      // ตรวจสอบว่า tab ยังมีอยู่และเข้าถึงได้
+      if (!targetTab.url || targetTab.url.startsWith('chrome://') || targetTab.url.startsWith('chrome-extension://')) {
+        logToContent(targetTabId, `✗ Side panel tab ${targetTabId} is not accessible`);
+        return { 
+          success: false, 
+          error: 'Side panel tab is not accessible (chrome:// or extension page)' 
+        };
+      }
+    } catch (error) {
+      logToContent(targetTabId, `✗ Side panel tab ${targetTabId} no longer exists: ${error.message}`);
+      
+      // เคลียร์ stored tab ID ถ้าเป็น tab เดียวกัน
+      if (sidePanelTabId === targetTabId) {
         sidePanelTabId = null;
-        targetTab = null;
       }
-    } else {
-      logToContent(debugTabId, 'No side panel tab ID stored');
-    }
-    
-    // ถ้าไม่มี side panel tab หรือไม่สามารถใช้ได้ ใช้ active tab
-    if (!targetTab) {
-      try {
-        logToContent(debugTabId, 'Trying to get active tab...');
-        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (activeTab && activeTab.id) {
-          targetTab = activeTab;
-          logToContent(activeTab.id, `✓ Using active tab - ID: ${targetTab.id}, Window: ${targetTab.windowId}, URL: ${targetTab.url}`);
-        } else {
-          logToContent(debugTabId, '✗ No active tab found');
-        }
-      } catch (error) {
-        logToContent(debugTabId, `✗ Failed to get active tab: ${error.message}`);
-      }
+      
+      return { 
+        success: false, 
+        error: `Side panel tab no longer exists: ${error.message}` 
+      };
     }
     
     if (!targetTab || !targetTab.id) {
-      logToContent(debugTabId, '✗ No target tab found');
-      return { success: false, error: 'No target tab found' };
+      logToContent(targetTabId, '✗ No valid target tab found');
+      return { success: false, error: 'No valid target tab found' };
     }
 
     logToContent(targetTab.id, `Final target tab: ID ${targetTab.id}, Window ${targetTab.windowId}, URL: ${targetTab.url}`);
-    
-    // Check if URL is accessible
-    if (!targetTab.url || targetTab.url.startsWith('chrome://') || targetTab.url.startsWith('chrome-extension://')) {
-      logToContent(targetTab.id, '✗ Target tab URL is not accessible');
-      return { success: false, error: 'Cannot access this type of page' };
-    }
     
     // Check if content script is ready
     const tabInfo = readyTabs.get(targetTab.id);
@@ -233,8 +230,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   // Side panel opened signal
   if (message.type === 'SIDE_PANEL_OPENED') {
-    if (sender.tab) {
-      setSidePanelTab(sender.tab.id, sender.tab.windowId);
+    // ใช้ tab ID ที่ส่งมาจาก message หรือ sender tab
+    const tabId = message.tabId || (sender.tab ? sender.tab.id : null);
+    const windowId = sender.tab ? sender.tab.windowId : null;
+    
+    if (tabId) {
+      setSidePanelTab(tabId, windowId);
     }
     sendResponse({ success: true });
     return;
@@ -242,9 +243,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   // Execute DOM command
   if (message.type === 'EXECUTE_DOM_COMMAND') {
-    console.log(`[BACKGROUND] Command execution request - Current side panel tab: ${sidePanelTabId}`);
+    console.log(`[BACKGROUND] Command execution request`);
+    console.log(`[BACKGROUND] Request side panel tab ID: ${message.sidePanelTabId}`);
+    console.log(`[BACKGROUND] Stored side panel tab ID: ${sidePanelTabId}`);
     console.log(`[BACKGROUND] Ready tabs: ${Array.from(readyTabs.keys()).join(', ')}`);
-    executeCommandOnTargetTab(message.command)
+    
+    executeCommandOnTargetTab(message.command, message.sidePanelTabId)
       .then(result => {
         console.log('[BACKGROUND] Command execution result:', result);
         sendResponse(result);

@@ -8,6 +8,7 @@ export interface ChromeCommand {
 
 export class ChromeExtensionHandler {
   private isExtensionContext: boolean;
+  private currentTabId: number | null = null;
 
   constructor() {
     // ตรวจสอบว่าอยู่ใน Chrome Extension context หรือไม่
@@ -20,16 +21,52 @@ export class ChromeExtensionHandler {
 
     // ส่งสัญญาณไปยัง background script ว่า side panel เปิดแล้ว
     if (this.isExtensionContext) {
-      this.notifySidePanelOpened();
+      this.initializeSidePanel();
     }
   }
 
-  private async notifySidePanelOpened() {
+  private async initializeSidePanel() {
     try {
       const chrome = (window as any).chrome;
-      console.log('[CHROME_HANDLER] Sending side panel opened signal...');
+      
+      // ขั้นแรก: ดึง tab ID ของหน้าต่างปัจจุบัน
+      console.log('[CHROME_HANDLER] Getting current tab information...');
+      
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
+        if (chrome.runtime.lastError) {
+          console.log('[CHROME_HANDLER] Error getting current tab:', chrome.runtime.lastError.message);
+          this.sendSidePanelSignal(null);
+          return;
+        }
+        
+        if (tabs && tabs.length > 0) {
+          this.currentTabId = tabs[0].id;
+          console.log('[CHROME_HANDLER] Found current tab ID:', this.currentTabId);
+          console.log('[CHROME_HANDLER] Tab URL:', tabs[0].url);
+          console.log('[CHROME_HANDLER] Window ID:', tabs[0].windowId);
+          
+          // ส่งสัญญาณพร้อม tab ID
+          this.sendSidePanelSignal(this.currentTabId);
+        } else {
+          console.log('[CHROME_HANDLER] No tabs found');
+          this.sendSidePanelSignal(null);
+        }
+      });
+      
+    } catch (error) {
+      console.error('[CHROME_HANDLER] Error initializing side panel:', error);
+      this.sendSidePanelSignal(null);
+    }
+  }
+
+  private sendSidePanelSignal(tabId: number | null) {
+    try {
+      const chrome = (window as any).chrome;
+      console.log('[CHROME_HANDLER] Sending side panel opened signal with tab ID:', tabId);
+      
       chrome.runtime.sendMessage({
-        type: 'SIDE_PANEL_OPENED'
+        type: 'SIDE_PANEL_OPENED',
+        tabId: tabId
       }, (response: any) => {
         if (chrome.runtime.lastError) {
           console.log('[CHROME_HANDLER] Failed to send side panel opened signal:', chrome.runtime.lastError.message);
@@ -53,6 +90,7 @@ export class ChromeExtensionHandler {
 
     try {
       console.log('[CHROME_HANDLER] === COMMAND EXECUTION START ===');
+      console.log('[CHROME_HANDLER] Current tab ID:', this.currentTabId);
       console.log('[CHROME_HANDLER] Sending command to background script:', command);
       
       const chrome = (window as any).chrome;
@@ -60,7 +98,8 @@ export class ChromeExtensionHandler {
       const result = await new Promise((resolve, reject) => {
         chrome.runtime.sendMessage({
           type: 'EXECUTE_DOM_COMMAND',
-          command: command
+          command: command,
+          sidePanelTabId: this.currentTabId // ส่ง tab ID ไปด้วย
         }, (response: any) => {
           if (chrome.runtime.lastError) {
             console.error('[CHROME_HANDLER] Runtime error:', chrome.runtime.lastError);
@@ -98,5 +137,10 @@ export class ChromeExtensionHandler {
   async testConnection(): Promise<any> {
     console.log('[CHROME_HANDLER] Testing connection...');
     return this.executeCommand({ action: 'scan_elements' });
+  }
+
+  // ดึง tab ID ปัจจุบัน
+  getCurrentTabId(): number | null {
+    return this.currentTabId;
   }
 }
