@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getWebSocketUrl } from '../config/env';
 
@@ -5,21 +6,57 @@ export const useWebSocket = (user = 'nueng') => {
   const [isConnected, setIsConnected] = useState(false);
   const [messages, setMessages] = useState([]);
   const [error, setError] = useState(null);
+  const [tabId, setTabId] = useState(null);
+  const [room, setRoom] = useState(null);
   const ws = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
   const isConnecting = useRef(false);
 
-  const connect = useCallback(() => {
+  // Get current tab ID and room information
+  const getCurrentTabInfo = useCallback(async () => {
+    try {
+      // Try to get tab ID from Chrome extension if available
+      if (typeof chrome !== 'undefined' && chrome.tabs) {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tabs.length > 0) {
+          const currentTabId = tabs[0].id;
+          setTabId(currentTabId);
+          console.log('Got tab ID from Chrome extension:', currentTabId);
+          return currentTabId;
+        }
+      }
+      
+      // Fallback: generate a unique tab ID based on session
+      const fallbackTabId = `web_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      setTabId(fallbackTabId);
+      console.log('Generated fallback tab ID:', fallbackTabId);
+      return fallbackTabId;
+    } catch (error) {
+      console.error('Error getting tab info:', error);
+      const fallbackTabId = `web_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      setTabId(fallbackTabId);
+      return fallbackTabId;
+    }
+  }, []);
+
+  const connect = useCallback(async () => {
     // Prevent multiple simultaneous connection attempts
     if (isConnecting.current || (ws.current && ws.current.readyState === WebSocket.CONNECTING)) {
       return;
     }
 
     try {
+      // Get tab info before connecting
+      const currentTabId = await getCurrentTabInfo();
+      const currentRoom = `room_${user}_${currentTabId}`;
+      setRoom(currentRoom);
+
       const wsUrl = getWebSocketUrl(user);
       console.log('Attempting WebSocket connection to:', wsUrl);
+      console.log('Tab ID:', currentTabId);
+      console.log('Room:', currentRoom);
       
       isConnecting.current = true;
       ws.current = new WebSocket(wsUrl);
@@ -30,6 +67,26 @@ export const useWebSocket = (user = 'nueng') => {
         setError(null);
         reconnectAttempts.current = 0;
         isConnecting.current = false;
+
+        // Send initial connection info to server
+        const connectionInfo = {
+          tranType: 'response',
+          type: 'connection',
+          action: 'connect',
+          message: 'Connected successfully',
+          tab_id: currentTabId,
+          room: currentRoom,
+          data: {
+            user: user,
+            timestamp: new Date().toISOString(),
+            userAgent: navigator.userAgent
+          }
+        };
+        
+        if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+          ws.current.send(JSON.stringify(connectionInfo));
+          console.log('Sent connection info to server:', connectionInfo);
+        }
       };
 
       ws.current.onmessage = (event) => {
@@ -43,7 +100,6 @@ export const useWebSocket = (user = 'nueng') => {
             setMessages(prev => [...prev, data]);
           } else if (data.tranType === 'response') {
             console.log('Received response from server:', data);
-            // อาจจะต้องการจัดการ response จากเซิร์ฟเวอร์เพิ่มเติม
             setMessages(prev => [...prev, data]);
           } else {
             // สำหรับข้อความทั่วไปที่ไม่มี tranType
@@ -89,7 +145,7 @@ export const useWebSocket = (user = 'nueng') => {
       isConnecting.current = false;
       setError('Failed to create WebSocket connection');
     }
-  }, [user]);
+  }, [user, getCurrentTabInfo]);
 
   const disconnect = useCallback(() => {
     console.log('Disconnecting WebSocket...');
@@ -133,9 +189,17 @@ export const useWebSocket = (user = 'nueng') => {
 
   // ฟังก์ชันสำหรับส่ง response กลับเซิร์ฟเวอร์
   const sendResponse = useCallback((responseCommand) => {
-    console.log('Sending response to server:', responseCommand);
-    return sendMessage(responseCommand);
-  }, [sendMessage]);
+    // เพิ่ม tab_id และ room ใน response
+    const enhancedResponse = {
+      ...responseCommand,
+      tab_id: tabId,
+      room: room,
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log('Sending enhanced response to server:', enhancedResponse);
+    return sendMessage(enhancedResponse);
+  }, [sendMessage, tabId, room]);
 
   const clearError = useCallback(() => {
     setError(null);
@@ -160,8 +224,10 @@ export const useWebSocket = (user = 'nueng') => {
     isConnected,
     messages,
     error,
+    tabId,
+    room,
     sendMessage,
-    sendResponse, // เพิ่ม sendResponse ใน return
+    sendResponse,
     connect,
     disconnect,
     clearError,

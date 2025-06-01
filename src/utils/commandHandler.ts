@@ -57,7 +57,7 @@ export class CommandHandler {
   private onImageReceived?: (imageUrl: string) => void;
   private onConfirmRequest?: (message: string) => Promise<boolean>;
   private onDebugMessage?: (message: string) => void;
-  private onResponseReady?: (response: ResponseCommand) => void;
+  private sendResponseCallback?: (response: ResponseCommand) => boolean;
   private chromeHandler: ChromeExtensionHandler;
 
   constructor(callbacks: {
@@ -65,13 +65,13 @@ export class CommandHandler {
     onImageReceived?: (imageUrl: string) => void;
     onConfirmRequest?: (message: string) => Promise<boolean>;
     onDebugMessage?: (message: string) => void;
-    onResponseReady?: (response: ResponseCommand) => void;
+    sendResponse?: (response: ResponseCommand) => boolean;
   }) {
     this.onTextMessage = callbacks.onTextMessage;
     this.onImageReceived = callbacks.onImageReceived;
     this.onConfirmRequest = callbacks.onConfirmRequest;
     this.onDebugMessage = callbacks.onDebugMessage;
-    this.onResponseReady = callbacks.onResponseReady;
+    this.sendResponseCallback = callbacks.sendResponse;
     this.chromeHandler = new ChromeExtensionHandler();
   }
 
@@ -90,11 +90,14 @@ export class CommandHandler {
       data: result.success ? result : { error: result.error }
     };
 
-    console.log('Sending response:', response);
+    console.log('Created response:', response);
 
-    // ส่ง response กลับผ่าน callback
-    if (this.onResponseReady) {
-      this.onResponseReady(response);
+    // ส่ง response กลับผ่าน WebSocket callback
+    if (this.sendResponseCallback) {
+      const sent = this.sendResponseCallback(response);
+      console.log('Response sent via WebSocket:', sent);
+    } else {
+      console.warn('No sendResponse callback available, response not sent to server');
     }
     
     // Send debug message if debug mode is enabled
