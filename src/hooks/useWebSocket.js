@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getWebSocketUrl } from '../config/env';
 
@@ -41,9 +40,15 @@ export const useWebSocket = (user = 'nueng') => {
           // ตรวจสอบว่าเป็น command ที่มี tranType หรือไม่
           if (data.tranType === 'request') {
             console.log('Received command request:', data);
+            setMessages(prev => [...prev, data]);
+          } else if (data.tranType === 'response') {
+            console.log('Received response from server:', data);
+            // อาจจะต้องการจัดการ response จากเซิร์ฟเวอร์เพิ่มเติม
+            setMessages(prev => [...prev, data]);
+          } else {
+            // สำหรับข้อความทั่วไปที่ไม่มี tranType
+            setMessages(prev => [...prev, data]);
           }
-          
-          setMessages(prev => [...prev, data]);
         } catch (err) {
           console.error('Error parsing WebSocket message:', err);
           // Don't set error for parsing issues, just log them
@@ -156,7 +161,7 @@ export const useWebSocket = (user = 'nueng') => {
     messages,
     error,
     sendMessage,
-    sendResponse,
+    sendResponse, // เพิ่ม sendResponse ใน return
     connect,
     disconnect,
     clearError,

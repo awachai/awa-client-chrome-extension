@@ -86,8 +86,11 @@ export class CommandHandler {
       type: command.type,
       action: command.action,
       message: result.success ? 'success' : (result.error || 'Unknown error'),
+      selector: command.selector || '',
       data: result.success ? result : { error: result.error }
     };
+
+    console.log('Sending response:', response);
 
     // ส่ง response กลับผ่าน callback
     if (this.onResponseReady) {
