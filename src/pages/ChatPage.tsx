@@ -573,8 +573,8 @@ const ChatPage = () => {
                 'bg-white'
               }`}>
                 <CardContent className="p-2">
-                  {/* JSON Command Indicator */}
-                  {message.isJson && (
+                  {/* JSON Command Indicator - Only show in debug mode */}
+                  {message.isJson && debugMode && (
                     <div className="flex items-center space-x-1 mb-2 text-xs">
                       <Code className="h-3 w-3" />
                       <span className="font-medium text-orange-600">JSON Command</span>
@@ -587,8 +587,8 @@ const ChatPage = () => {
                     {message.content}
                   </p>
                   
-                  {/* JSON Command Preview */}
-                  {message.isJson && message.jsonCommand && (
+                  {/* JSON Command Preview - Only show in debug mode */}
+                  {message.isJson && message.jsonCommand && debugMode && (
                     <div className="mt-2 p-2 bg-gray-800 rounded text-xs">
                       <pre className="text-green-400 font-mono overflow-x-auto">
                         {JSON.stringify(message.jsonCommand, null, 2)}
