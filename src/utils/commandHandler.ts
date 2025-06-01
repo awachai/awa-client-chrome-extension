@@ -5,7 +5,7 @@ import { ChromeExtensionHandler } from "./chromeExtensionHandler";
 
 export interface BaseCommand {
   tranType: 'request' | 'response';
-  type: 'command' | 'text' | 'image' | 'confirm';
+  type: 'command' | 'text' | 'image' | 'confirm' | 'echo' | 'connection' | string;
   action: string;
   message?: string;
   selector?: string;
@@ -75,12 +75,22 @@ export class CommandHandler {
     this.chromeHandler = new ChromeExtensionHandler();
   }
 
-  async executeCommand(command: WebSocketCommand): Promise<ResponseCommand> {
+  async executeCommand(command: WebSocketCommand): Promise<ResponseCommand | null> {
     console.log('Executing command:', command);
+
+    // ตรวจสอบว่าเป็น command ที่ต้องการ response หรือไม่
+    const needsResponse = this.shouldSendResponse(command);
+    
+    if (!needsResponse) {
+      console.log('Command type does not require response:', command.type);
+      // ทำการประมวลผลคำสั่งแต่ไม่ส่ง response กลับ
+      await this._executeCommandInternal(command);
+      return null;
+    }
 
     const result = await this._executeCommandInternal(command);
     
-    // สร้าง response command
+    // สร้าง response command เฉพาะคำสั่งที่ต้องการ response
     const response: ResponseCommand = {
       tranType: 'response',
       type: command.type,
@@ -107,6 +117,13 @@ export class CommandHandler {
     }
 
     return response;
+  }
+
+  // ตรวจสอบว่าคำสั่งต้องการ response หรือไม่
+  private shouldSendResponse(command: any): boolean {
+    // ส่ง response เฉพาะ command types ที่ต้องการ
+    const responseTypes = ['command', 'text', 'image', 'confirm'];
+    return responseTypes.includes(command.type);
   }
 
   private async _executeCommandInternal(command: WebSocketCommand): Promise<any> {
