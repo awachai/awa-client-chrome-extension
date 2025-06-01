@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getWebSocketUrl } from '../config/env';
 
@@ -198,7 +197,34 @@ export const useWebSocket = (user = 'nueng') => {
     };
     
     console.log('Sending enhanced response to server:', enhancedResponse);
-    return sendMessage(enhancedResponse);
+    const sent = sendMessage(enhancedResponse);
+    
+    // แสดง console log ใน content script ด้วย
+    if (sent) {
+      console.log('✅ Response sent successfully via WebSocket:', enhancedResponse);
+      
+      // ส่ง console log ไปยัง content script ด้วย
+      if (typeof chrome !== 'undefined' && chrome.tabs && tabId) {
+        try {
+          // ถ้าเป็น Chrome Extension context ให้ส่ง log ไป content script
+          chrome.tabs.sendMessage(parseInt(tabId), {
+            type: 'CONSOLE_LOG',
+            message: `Response sent to server: ${JSON.stringify(enhancedResponse)}`,
+            level: 'info'
+          }, (response) => {
+            if (chrome.runtime.lastError) {
+              console.log('Could not send log to content script:', chrome.runtime.lastError.message);
+            }
+          });
+        } catch (error) {
+          console.log('Error sending log to content script:', error);
+        }
+      }
+    } else {
+      console.error('❌ Failed to send response via WebSocket');
+    }
+    
+    return sent;
   }, [sendMessage, tabId, room]);
 
   const clearError = useCallback(() => {
