@@ -37,6 +37,12 @@ export const useWebSocket = (user = 'nueng') => {
         try {
           const data = JSON.parse(event.data);
           console.log('WebSocket message received:', data);
+          
+          // ตรวจสอบว่าเป็น command ที่มี tranType หรือไม่
+          if (data.tranType === 'request') {
+            console.log('Received command request:', data);
+          }
+          
           setMessages(prev => [...prev, data]);
         } catch (err) {
           console.error('Error parsing WebSocket message:', err);
@@ -120,6 +126,12 @@ export const useWebSocket = (user = 'nueng') => {
     }
   }, []);
 
+  // ฟังก์ชันสำหรับส่ง response กลับเซิร์ฟเวอร์
+  const sendResponse = useCallback((responseCommand) => {
+    console.log('Sending response to server:', responseCommand);
+    return sendMessage(responseCommand);
+  }, [sendMessage]);
+
   const clearError = useCallback(() => {
     setError(null);
   }, []);
@@ -144,6 +156,7 @@ export const useWebSocket = (user = 'nueng') => {
     messages,
     error,
     sendMessage,
+    sendResponse,
     connect,
     disconnect,
     clearError,

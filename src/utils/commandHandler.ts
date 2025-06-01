@@ -3,30 +3,51 @@ import { debug_mode } from "../config/env";
 import { DOMUtils, ElementInfo } from "./domUtils";
 import { ChromeExtensionHandler } from "./chromeExtensionHandler";
 
-export interface TextCommand {
+export interface BaseCommand {
+  tranType: 'request' | 'response';
+  type: 'command' | 'text' | 'image' | 'confirm';
+  action: string;
+  message?: string;
+  selector?: string;
+  data?: any;
+}
+
+export interface TextCommand extends BaseCommand {
+  tranType: 'request';
   type: 'text';
   action: 'say';
   message: string;
 }
 
-export interface CommandAction {
+export interface CommandAction extends BaseCommand {
+  tranType: 'request';
   type: 'command';
-  action: 'highlight' | 'click' | 'scroll_to' | 'get_dom' | 'popup' | 'fill_form';
+  action: 'highlight' | 'click' | 'scroll_to' | 'get_dom' | 'popup' | 'fill_form' | 'scan_elements';
   selector?: string;
   message?: string;
-  data?: Array<{ selector: string; value: string }>;
+  data?: any;
 }
 
-export interface ImageCommand {
+export interface ImageCommand extends BaseCommand {
+  tranType: 'request';
   type: 'image';
   action: 'show_image';
   message: string; // URL or base64
 }
 
-export interface ConfirmCommand {
+export interface ConfirmCommand extends BaseCommand {
+  tranType: 'request';
   type: 'confirm';
   action: 'ask_user';
   message: string;
+}
+
+export interface ResponseCommand extends BaseCommand {
+  tranType: 'response';
+  type: 'command' | 'text' | 'image' | 'confirm';
+  action: string;
+  message: string; // success message or error message
+  data?: any; // response data
 }
 
 export type WebSocketCommand = TextCommand | CommandAction | ImageCommand | ConfirmCommand;
@@ -36,6 +57,7 @@ export class CommandHandler {
   private onImageReceived?: (imageUrl: string) => void;
   private onConfirmRequest?: (message: string) => Promise<boolean>;
   private onDebugMessage?: (message: string) => void;
+  private onResponseReady?: (response: ResponseCommand) => void;
   private chromeHandler: ChromeExtensionHandler;
 
   constructor(callbacks: {
@@ -43,18 +65,34 @@ export class CommandHandler {
     onImageReceived?: (imageUrl: string) => void;
     onConfirmRequest?: (message: string) => Promise<boolean>;
     onDebugMessage?: (message: string) => void;
+    onResponseReady?: (response: ResponseCommand) => void;
   }) {
     this.onTextMessage = callbacks.onTextMessage;
     this.onImageReceived = callbacks.onImageReceived;
     this.onConfirmRequest = callbacks.onConfirmRequest;
     this.onDebugMessage = callbacks.onDebugMessage;
+    this.onResponseReady = callbacks.onResponseReady;
     this.chromeHandler = new ChromeExtensionHandler();
   }
 
-  async executeCommand(command: WebSocketCommand): Promise<any> {
+  async executeCommand(command: WebSocketCommand): Promise<ResponseCommand> {
     console.log('Executing command:', command);
 
     const result = await this._executeCommandInternal(command);
+    
+    // สร้าง response command
+    const response: ResponseCommand = {
+      tranType: 'response',
+      type: command.type,
+      action: command.action,
+      message: result.success ? 'success' : (result.error || 'Unknown error'),
+      data: result.success ? result : { error: result.error }
+    };
+
+    // ส่ง response กลับผ่าน callback
+    if (this.onResponseReady) {
+      this.onResponseReady(response);
+    }
     
     // Send debug message if debug mode is enabled
     if (debug_mode && this.onDebugMessage) {
@@ -62,7 +100,7 @@ export class CommandHandler {
       this.onDebugMessage(debugMessage);
     }
 
-    return result;
+    return response;
   }
 
   private async _executeCommandInternal(command: WebSocketCommand): Promise<any> {
@@ -158,6 +196,11 @@ export class CommandHandler {
         return this.chromeHandler.executeCommand({
           action: 'fill_form',
           data: command.data!
+        });
+
+      case 'scan_elements':
+        return this.chromeHandler.executeCommand({
+          action: 'scan_elements'
         });
       
       case 'popup':
