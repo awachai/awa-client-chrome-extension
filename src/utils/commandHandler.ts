@@ -191,40 +191,42 @@ export class CommandHandler {
   }
 
   private async executeCommandViaExtension(command: CommandAction) {
+    const originalCommand = command; // เก็บ original command สำหรับ WebSocket response
+    
     switch (command.action) {
       case 'highlight':
         return this.chromeHandler.executeCommand({
           action: 'highlight',
           selector: command.selector!
-        });
+        }, originalCommand);
       
       case 'click':
         return this.chromeHandler.executeCommand({
           action: 'click',
           selector: command.selector!
-        });
+        }, originalCommand);
       
       case 'scroll_to':
         return this.chromeHandler.executeCommand({
           action: 'scroll_to',
           selector: command.selector!
-        });
+        }, originalCommand);
       
       case 'get_dom':
         return this.chromeHandler.executeCommand({
           action: 'get_dom'
-        });
+        }, originalCommand);
       
       case 'fill_form':
         return this.chromeHandler.executeCommand({
           action: 'fill_form',
           data: command.data!
-        });
+        }, originalCommand);
 
       case 'scan_elements':
         return this.chromeHandler.executeCommand({
           action: 'scan_elements'
-        });
+        }, originalCommand);
       
       case 'popup':
         return this.showPopup(command.message!);

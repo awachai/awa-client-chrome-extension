@@ -1,4 +1,3 @@
-
 // Chrome Extension Message Handler
 export interface ChromeCommand {
   action: 'highlight' | 'click' | 'scroll_to' | 'get_dom' | 'fill_form' | 'scan_elements';
@@ -79,7 +78,7 @@ export class ChromeExtensionHandler {
     }
   }
 
-  async executeCommand(command: ChromeCommand): Promise<any> {
+  async executeCommand(command: ChromeCommand, originalCommand?: any): Promise<any> {
     if (!this.isExtensionContext) {
       console.log('[CHROME_HANDLER] Not in extension context, cannot execute command');
       return { 
@@ -92,6 +91,7 @@ export class ChromeExtensionHandler {
       console.log('[CHROME_HANDLER] === COMMAND EXECUTION START ===');
       console.log('[CHROME_HANDLER] Current tab ID:', this.currentTabId);
       console.log('[CHROME_HANDLER] Sending command to background script:', command);
+      console.log('[CHROME_HANDLER] Original command for WebSocket response:', originalCommand);
       
       const chrome = (window as any).chrome;
       
@@ -99,7 +99,8 @@ export class ChromeExtensionHandler {
         chrome.runtime.sendMessage({
           type: 'EXECUTE_DOM_COMMAND',
           command: command,
-          sidePanelTabId: this.currentTabId // ส่ง tab ID ไปด้วย
+          sidePanelTabId: this.currentTabId, // ส่ง tab ID ไปด้วย
+          originalCommand: originalCommand // ส่ง original command เพื่อใช้ใน WebSocket response
         }, (response: any) => {
           if (chrome.runtime.lastError) {
             console.error('[CHROME_HANDLER] Runtime error:', chrome.runtime.lastError);
