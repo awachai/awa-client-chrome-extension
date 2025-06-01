@@ -1,3 +1,4 @@
+
 // Content Script - ทำงานบนหน้าเว็บจริง
 (function() {
   'use strict';
@@ -432,6 +433,25 @@
   // Chrome Runtime Message Listener
   function handleMessage(message, sender, sendResponse) {
     console.log('Content script received message:', message);
+    
+    // Handle console log messages from background script
+    if (message.type === 'CONSOLE_LOG') {
+      const logMessage = `[BACKGROUND → CONTENT] ${message.message}`;
+      switch (message.level) {
+        case 'error':
+          console.error(logMessage);
+          break;
+        case 'warn':
+          console.warn(logMessage);
+          break;
+        case 'info':
+          console.info(logMessage);
+          break;
+        default:
+          console.log(logMessage);
+      }
+      return;
+    }
     
     // Handle ping/pong for checking if script is alive
     if (message.type === 'PING') {
