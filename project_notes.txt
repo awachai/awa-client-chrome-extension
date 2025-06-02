@@ -1,0 +1,59 @@
+
+PROJECT NOTES - AI WEB AGENT DEVELOPMENT
+========================================
+
+วันที่: 2025-06-02
+เวลา: การสร้างไฟล์บันทึกโปรเจ็ค
+
+สรุปความเข้าใจโปรเจ็ค:
+-------------------------
+
+เป็นการพัฒนา AI Web Agent ที่เป็น Chrome Extension มีฟีเจอร์หลักดังนี้:
+
+1. WebSocket Communication System
+   - การเชื่อมต่อกับ AI server ผ่าน WebSocket
+   - ส่งและรับข้อความแบบ real-time
+   - มี authentication system ด้วย token
+
+2. JSON Command System
+   - ระบบคำสั่งในรูปแบบ JSON สำหรับควบคุม DOM elements
+   - รองรับคำสั่งต่างๆ เช่น click, highlight, scroll_to
+   - ตัวอย่างคำสั่ง: {"tranType":"request","type":"command","action":"click","message":"","selector":"#fQuote > div:nth-child(4) > button"}
+
+3. Chrome Extension Components
+   - Background script (background.js)
+   - Content script (content.js) 
+   - Side panel interface
+   - Message handling system
+
+4. React UI Components
+   - ChatPage: หน้าหลักสำหรับแชทกับ AI
+   - LoginPage: หน้า authentication
+   - Debug mode: สำหรับตรวจสอบสถานะการเชื่อมต่อ
+
+5. หน้าที่หลักของระบบ
+   - ใช้ AI สำหรับควบคุมการทำงานบนเว็บไซต์ต่างๆ
+   - ส่งคำสั่งผ่าน WebSocket ไปยัง server
+   - ประมวลผลคำสั่งและดำเนินการบน DOM
+
+ปัญหาปัจจุบัน:
+--------------
+- JSON command ที่ส่งไปไม่ทำงาน ต้องตรวจสอบ WebSocket connection และ command processing
+
+สถานะการพัฒนา:
+--------------
+- มี debug panel สำหรับตรวจสอบสถานะ WebSocket
+- มี authentication system
+- มี command handler structure
+- ต้องแก้ไขปัญหา JSON command execution
+
+คำแนะนำการใช้งาน:
+-----------------
+- เปิด debug mode เพื่อดูสถานะการเชื่อมต่อ
+- ตรวจสอบ WebSocket messages ใน debug panel
+- ตรวจสอบ console logs สำหรับ debugging
+
+หมายเหตุ:
+--------
+- ไฟล์นี้จะถูกอัปเดตทุกครั้งที่มีการสั่งให้จำข้อมูลใหม่
+- จะมีการบันทึกวันที่และเวลาของการอัปเดต
