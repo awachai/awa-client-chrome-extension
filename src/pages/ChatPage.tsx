@@ -145,12 +145,16 @@ const ChatPage = () => {
             } else {
               console.log('Command executed successfully:', response);
               
+              // ตรวจสอบ response และสร้าง message ที่เหมาะสม
+              const isSuccess = response && (response.success === true || response.message === 'success');
+              const responseMessage = isSuccess ? 'success' : (response?.error || response?.message || 'unknown error');
+              
               // ส่ง success response กลับ
               const successResponse = {
                 tranType: 'response',
                 type: 'command',
                 action: latestMessage.action,
-                message: response?.success ? 'success' : (response?.error || 'unknown error'),
+                message: responseMessage,
                 selector: latestMessage.selector || '',
                 tab_id: tabId,
                 room: room,
@@ -163,7 +167,7 @@ const ChatPage = () => {
                 const debugMessage: Message = {
                   id: `debug-${Date.now()}`,
                   type: 'debug',
-                  content: `Command completed: ${successResponse.message}`,
+                  content: `Command completed: ${responseMessage}`,
                   timestamp: new Date()
                 };
                 setMessages(prev => [...prev, debugMessage]);
@@ -180,7 +184,7 @@ const ChatPage = () => {
                 tranType: 'response',
                 type: 'command',
                 action: latestMessage.action,
-                message: result.success ? 'success' : (result.error || 'unknown error'),
+                message: result.message || 'completed',
                 selector: latestMessage.selector || '',
                 tab_id: tabId,
                 room: room,
