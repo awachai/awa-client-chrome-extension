@@ -16,18 +16,31 @@ const LoginPage = () => {
   const { toast } = useToast();
   const { login, isLoading, error, clearError } = useAuth();
 
-  console.log('[LOGIN_DEBUG] LoginPage rendered');
-  console.log('[LOGIN_DEBUG] Auth state:', { isLoading, error });
+  // ฟังก์ชั่นส่ง log ไปยัง background script
+  const logToContent = (message: string, level: string = 'log') => {
+    if (typeof chrome !== 'undefined' && chrome.runtime) {
+      chrome.runtime.sendMessage({
+        type: 'LOG_TO_CONTENT',
+        message: `[LOGIN_DEBUG] ${message}`,
+        level: level
+      });
+    } else {
+      console.log(`[LOGIN_DEBUG] ${message}`);
+    }
+  };
+
+  logToContent('LoginPage rendered');
+  logToContent(`Auth state: ${JSON.stringify({ isLoading, error })}`);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('[LOGIN_DEBUG] Form submitted');
-    console.log('[LOGIN_DEBUG] Credentials:', { username, password: password ? '***' : 'empty' });
+    logToContent('Form submitted');
+    logToContent(`Credentials: ${JSON.stringify({ username, password: password ? '***' : 'empty' })}`);
     
     clearError();
 
     if (!username || !password) {
-      console.log('[LOGIN_DEBUG] Missing credentials');
+      logToContent('Missing credentials');
       toast({
         title: "ข้อมูลไม่ครบถ้วน",
         description: "กรุณากรอกชื่อผู้ใช้และรหัสผ่าน",
@@ -36,20 +49,20 @@ const LoginPage = () => {
       return;
     }
 
-    console.log('[LOGIN_DEBUG] Calling login function...');
+    logToContent('Calling login function...');
     try {
       const result = await login({ username, password });
-      console.log('[LOGIN_DEBUG] Login result:', result);
+      logToContent(`Login result: ${JSON.stringify(result)}`);
 
       if (result.success) {
-        console.log('[LOGIN_DEBUG] Login successful, navigating to chat');
+        logToContent('Login successful, navigating to chat');
         toast({
           title: "เข้าสู่ระบบสำเร็จ",
           description: "ยินดีต้อนรับเข้าสู่ AI Web Agent",
         });
         navigate('/chat');
       } else {
-        console.log('[LOGIN_DEBUG] Login failed:', result.error);
+        logToContent(`Login failed: ${result.error}`);
         toast({
           title: "เข้าสู่ระบบไม่สำเร็จ",
           description: result.error || "กรุณาตรวจสอบชื่อผู้ใช้และรหัสผ่าน",
@@ -57,7 +70,7 @@ const LoginPage = () => {
         });
       }
     } catch (err) {
-      console.error('[LOGIN_DEBUG] Login error:', err);
+      logToContent(`Login error: ${err}`, 'error');
       toast({
         title: "เกิดข้อผิดพลาด",
         description: "ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่อีกครั้ง",
@@ -88,7 +101,7 @@ const LoginPage = () => {
                   placeholder="ชื่อผู้ใช้"
                   value={username}
                   onChange={(e) => {
-                    console.log('[LOGIN_DEBUG] Username changed:', e.target.value);
+                    logToContent(`Username changed: ${e.target.value}`);
                     setUsername(e.target.value);
                   }}
                   className="pl-10"
@@ -106,7 +119,7 @@ const LoginPage = () => {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => {
-                    console.log('[LOGIN_DEBUG] Password changed:', e.target.value ? '***' : 'empty');
+                    logToContent(`Password changed: ${e.target.value ? '***' : 'empty'}`);
                     setPassword(e.target.value);
                   }}
                   className="pl-10"
@@ -123,7 +136,7 @@ const LoginPage = () => {
               type="submit" 
               className="w-full font-kanit" 
               disabled={isLoading}
-              onClick={() => console.log('[LOGIN_DEBUG] Button clicked')}
+              onClick={() => logToContent('Button clicked')}
             >
               {isLoading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
             </Button>

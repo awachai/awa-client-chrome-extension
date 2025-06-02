@@ -18,39 +18,52 @@ export const useAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  console.log('[AUTH_DEBUG] useAuth hook initialized');
-  console.log('[AUTH_DEBUG] API_BASE_URL:', API_BASE_URL);
+  // ฟังก์ชั่นส่ง log ไปยัง background script
+  const logToContent = (message: string, level: string = 'log') => {
+    if (typeof chrome !== 'undefined' && chrome.runtime) {
+      chrome.runtime.sendMessage({
+        type: 'LOG_TO_CONTENT',
+        message: `[AUTH_DEBUG] ${message}`,
+        level: level
+      });
+    } else {
+      console.log(`[AUTH_DEBUG] ${message}`);
+    }
+  };
+
+  logToContent('useAuth hook initialized');
+  logToContent(`API_BASE_URL: ${API_BASE_URL}`);
 
   // Check for existing auth data on mount
   useEffect(() => {
-    console.log('[AUTH_DEBUG] Checking for saved auth data...');
+    logToContent('Checking for saved auth data...');
     const savedAuthData = localStorage.getItem('authData');
     if (savedAuthData) {
       try {
         const parsed = JSON.parse(savedAuthData);
-        console.log('[AUTH_DEBUG] Found saved auth data:', parsed);
+        logToContent(`Found saved auth data: ${JSON.stringify(parsed)}`);
         setAuthData(parsed);
         setIsAuthenticated(true);
       } catch (err) {
-        console.error('[AUTH_DEBUG] Error parsing saved auth data:', err);
+        logToContent(`Error parsing saved auth data: ${err}`, 'error');
         localStorage.removeItem('authData');
       }
     } else {
-      console.log('[AUTH_DEBUG] No saved auth data found');
+      logToContent('No saved auth data found');
     }
   }, []);
 
   const login = async (credentials: LoginCredentials): Promise<{ success: boolean; error?: string }> => {
-    console.log('[AUTH_DEBUG] Login function called with:', { username: credentials.username, password: credentials.password ? '***' : 'empty' });
+    logToContent(`Login function called with: ${JSON.stringify({ username: credentials.username, password: credentials.password ? '***' : 'empty' })}`);
     
     setIsLoading(true);
     setError(null);
 
     const loginUrl = `${API_BASE_URL}/auth/login`;
-    console.log('[AUTH_DEBUG] Attempting to fetch:', loginUrl);
+    logToContent(`Attempting to fetch: ${loginUrl}`);
 
     try {
-      console.log('[AUTH_DEBUG] Making fetch request...');
+      logToContent('Making fetch request...');
       const response = await fetch(loginUrl, {
         method: 'POST',
         headers: {
@@ -62,43 +75,43 @@ export const useAuth = () => {
         }),
       });
 
-      console.log('[AUTH_DEBUG] Fetch response received:', {
+      logToContent(`Fetch response received: ${JSON.stringify({
         status: response.status,
         statusText: response.statusText,
         ok: response.ok
-      });
+      })}`);
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.log('[AUTH_DEBUG] Response error text:', errorText);
+        logToContent(`Response error text: ${errorText}`);
         throw new Error(`Login failed: ${response.status} - ${errorText}`);
       }
 
       const data: AuthData = await response.json();
-      console.log('[AUTH_DEBUG] Login response data:', data);
+      logToContent(`Login response data: ${JSON.stringify(data)}`);
       
       // Save auth data
       setAuthData(data);
       setIsAuthenticated(true);
       localStorage.setItem('authData', JSON.stringify(data));
 
-      console.log('[AUTH_DEBUG] Login successful, data saved');
+      logToContent('Login successful, data saved');
       return { success: true };
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-      console.error('[AUTH_DEBUG] Login error:', err);
-      console.error('[AUTH_DEBUG] Error message:', errorMessage);
+      logToContent(`Login error: ${err}`, 'error');
+      logToContent(`Error message: ${errorMessage}`, 'error');
       setError(errorMessage);
       return { success: false, error: errorMessage };
     } finally {
-      console.log('[AUTH_DEBUG] Setting loading to false');
+      logToContent('Setting loading to false');
       setIsLoading(false);
     }
   };
 
   const logout = () => {
-    console.log('[AUTH_DEBUG] Logout called');
+    logToContent('Logout called');
     setAuthData(null);
     setIsAuthenticated(false);
     setError(null);
@@ -106,7 +119,7 @@ export const useAuth = () => {
   };
 
   const clearError = () => {
-    console.log('[AUTH_DEBUG] Clear error called');
+    logToContent('Clear error called');
     setError(null);
   };
 
