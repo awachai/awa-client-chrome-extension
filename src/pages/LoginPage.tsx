@@ -16,11 +16,18 @@ const LoginPage = () => {
   const { toast } = useToast();
   const { login, isLoading, error, clearError } = useAuth();
 
+  console.log('[LOGIN_DEBUG] LoginPage rendered');
+  console.log('[LOGIN_DEBUG] Auth state:', { isLoading, error });
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[LOGIN_DEBUG] Form submitted');
+    console.log('[LOGIN_DEBUG] Credentials:', { username, password: password ? '***' : 'empty' });
+    
     clearError();
 
     if (!username || !password) {
+      console.log('[LOGIN_DEBUG] Missing credentials');
       toast({
         title: "ข้อมูลไม่ครบถ้วน",
         description: "กรุณากรอกชื่อผู้ใช้และรหัสผ่าน",
@@ -29,18 +36,31 @@ const LoginPage = () => {
       return;
     }
 
-    const result = await login({ username, password });
+    console.log('[LOGIN_DEBUG] Calling login function...');
+    try {
+      const result = await login({ username, password });
+      console.log('[LOGIN_DEBUG] Login result:', result);
 
-    if (result.success) {
+      if (result.success) {
+        console.log('[LOGIN_DEBUG] Login successful, navigating to chat');
+        toast({
+          title: "เข้าสู่ระบบสำเร็จ",
+          description: "ยินดีต้อนรับเข้าสู่ AI Web Agent",
+        });
+        navigate('/chat');
+      } else {
+        console.log('[LOGIN_DEBUG] Login failed:', result.error);
+        toast({
+          title: "เข้าสู่ระบบไม่สำเร็จ",
+          description: result.error || "กรุณาตรวจสอบชื่อผู้ใช้และรหัสผ่าน",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      console.error('[LOGIN_DEBUG] Login error:', err);
       toast({
-        title: "เข้าสู่ระบบสำเร็จ",
-        description: "ยินดีต้อนรับเข้าสู่ AI Web Agent",
-      });
-      navigate('/chat');
-    } else {
-      toast({
-        title: "เข้าสู่ระบบไม่สำเร็จ",
-        description: result.error || "กรุณาตรวจสอบชื่อผู้ใช้และรหัสผ่าน",
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่อีกครั้ง",
         variant: "destructive",
       });
     }
@@ -67,7 +87,10 @@ const LoginPage = () => {
                   type="text"
                   placeholder="ชื่อผู้ใช้"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e) => {
+                    console.log('[LOGIN_DEBUG] Username changed:', e.target.value);
+                    setUsername(e.target.value);
+                  }}
                   className="pl-10"
                   required
                 />
@@ -82,7 +105,10 @@ const LoginPage = () => {
                   type="password"
                   placeholder="••••••••"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    console.log('[LOGIN_DEBUG] Password changed:', e.target.value ? '***' : 'empty');
+                    setPassword(e.target.value);
+                  }}
                   className="pl-10"
                   required
                 />
@@ -97,6 +123,7 @@ const LoginPage = () => {
               type="submit" 
               className="w-full font-kanit" 
               disabled={isLoading}
+              onClick={() => console.log('[LOGIN_DEBUG] Button clicked')}
             >
               {isLoading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
             </Button>
