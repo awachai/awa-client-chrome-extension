@@ -38,6 +38,6 @@
     "128": "favicon.ico"
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' ws://localhost:8080"
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' ws://localhost:8080 http://localhost:8080"
   }
 }
