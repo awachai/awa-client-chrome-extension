@@ -55,16 +55,23 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
       setRoom(currentRoom);
 
       const wsUrl = getWebSocketUrl(user);
-      console.log('Attempting WebSocket connection to:', wsUrl);
+      
+      // เพิ่ม Authorization header ถ้ามี token
+      const wsUrlWithAuth = authData?.token 
+        ? `${wsUrl}?authorization=${encodeURIComponent(`Bearer ${authData.token}`)}`
+        : wsUrl;
+      
+      console.log('Attempting WebSocket connection to:', wsUrlWithAuth);
       console.log('Tab ID:', currentTabId);
       console.log('Room:', currentRoom);
       console.log('Auth Data:', authData);
+      console.log('Authorization header will be sent:', authData?.token ? `Bearer ${authData.token}` : 'No token');
       
       isConnecting.current = true;
-      ws.current = new WebSocket(wsUrl);
+      ws.current = new WebSocket(wsUrlWithAuth);
 
       ws.current.onopen = () => {
-        console.log('WebSocket connected successfully');
+        console.log('WebSocket connected successfully with authorization');
         setIsConnected(true);
         setError(null);
         reconnectAttempts.current = 0;
@@ -75,7 +82,7 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
           tranType: 'response',
           type: 'connection',
           action: 'connect',
-          message: 'Connected successfully',
+          message: 'Connected successfully with authorization',
           tab_id: currentTabId,
           room: currentRoom,
           token: authData?.token || null,
@@ -83,13 +90,14 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
             user: user,
             timestamp: new Date().toISOString(),
             userAgent: navigator.userAgent,
-            authenticated: !!authData
+            authenticated: !!authData,
+            hasToken: !!authData?.token
           }
         };
         
         if (ws.current && ws.current.readyState === WebSocket.OPEN) {
           ws.current.send(JSON.stringify(connectionInfo));
-          console.log('Sent connection info to server:', connectionInfo);
+          console.log('Sent connection info to server with auth:', connectionInfo);
         }
       };
 
