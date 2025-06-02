@@ -56,36 +56,31 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
 
       const wsUrl = getWebSocketUrl(user);
       
-      // เพิ่ม Authorization header ถ้ามี token
-      const wsUrlWithAuth = authData?.token 
-        ? `${wsUrl}?authorization=${encodeURIComponent(`Bearer ${authData.token}`)}`
-        : wsUrl;
-      
-      console.log('Attempting WebSocket connection to:', wsUrlWithAuth);
+      console.log('Attempting WebSocket connection to:', wsUrl);
       console.log('Tab ID:', currentTabId);
       console.log('Room:', currentRoom);
       console.log('Auth Data:', authData);
-      console.log('Authorization header will be sent:', authData?.token ? `Bearer ${authData.token}` : 'No token');
+      console.log('Will send token in connection message:', authData?.token ? 'Yes' : 'No');
       
       isConnecting.current = true;
-      ws.current = new WebSocket(wsUrlWithAuth);
+      ws.current = new WebSocket(wsUrl);
 
       ws.current.onopen = () => {
-        console.log('WebSocket connected successfully with authorization');
+        console.log('WebSocket connected successfully');
         setIsConnected(true);
         setError(null);
         reconnectAttempts.current = 0;
         isConnecting.current = false;
 
-        // Send initial connection info to server
+        // Send initial connection info with Authorization token
         const connectionInfo = {
-          tranType: 'response',
+          tranType: 'auth',
           type: 'connection',
           action: 'connect',
           message: 'Connected successfully with authorization',
           tab_id: currentTabId,
           room: currentRoom,
-          token: authData?.token || null,
+          authorization: authData?.token ? `Bearer ${authData.token}` : null,
           data: {
             user: user,
             timestamp: new Date().toISOString(),
@@ -97,7 +92,7 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
         
         if (ws.current && ws.current.readyState === WebSocket.OPEN) {
           ws.current.send(JSON.stringify(connectionInfo));
-          console.log('Sent connection info to server with auth:', connectionInfo);
+          console.log('Sent connection info to server with auth token:', connectionInfo);
         }
       };
 
