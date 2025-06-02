@@ -71,7 +71,10 @@ const ChatPage = () => {
     return { isJson: false };
   };
 
-  // Command handler for processing WebSocket commands
+  // WebSocket connection with message handling
+  const { isConnected, messages: wsMessages, error: wsError, sendMessage, retry, clearError } = useWebSocket('nueng');
+
+  // Command handler for processing WebSocket commands - Updated to pass sendMessage
   const commandHandler = new CommandHandler({
     onTextMessage: (message: string) => {
       const aiMessage: Message = {
@@ -107,11 +110,9 @@ const ChatPage = () => {
         };
         setMessages(prev => [...prev, debugMessage]);
       }
-    }
+    },
+    sendWebSocketMessage: sendMessage // ← เพิ่มการส่ง WebSocket message callback
   });
-
-  // WebSocket connection with message handling
-  const { isConnected, messages: wsMessages, error: wsError, sendMessage, retry, clearError } = useWebSocket('nueng');
 
   // Process WebSocket messages - handle both JSON commands and text messages
   React.useEffect(() => {

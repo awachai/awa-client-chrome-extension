@@ -57,7 +57,7 @@ export class CommandHandler {
   private onImageReceived?: (imageUrl: string) => void;
   private onConfirmRequest?: (message: string) => Promise<boolean>;
   private onDebugMessage?: (message: string) => void;
-  private sendResponseCallback?: (response: ResponseCommand) => boolean;
+  private sendWebSocketMessage?: (message: any) => boolean;
   private chromeHandler: ChromeExtensionHandler;
 
   constructor(callbacks: {
@@ -65,13 +65,13 @@ export class CommandHandler {
     onImageReceived?: (imageUrl: string) => void;
     onConfirmRequest?: (message: string) => Promise<boolean>;
     onDebugMessage?: (message: string) => void;
-    sendResponse?: (response: ResponseCommand) => boolean;
+    sendWebSocketMessage?: (message: any) => boolean;
   }) {
     this.onTextMessage = callbacks.onTextMessage;
     this.onImageReceived = callbacks.onImageReceived;
     this.onConfirmRequest = callbacks.onConfirmRequest;
     this.onDebugMessage = callbacks.onDebugMessage;
-    this.sendResponseCallback = callbacks.sendResponse;
+    this.sendWebSocketMessage = callbacks.sendWebSocketMessage;
     this.chromeHandler = new ChromeExtensionHandler();
   }
 
@@ -102,12 +102,18 @@ export class CommandHandler {
 
     console.log('Created response:', response);
 
-    // ส่ง response กลับผ่าน WebSocket callback
-    if (this.sendResponseCallback) {
-      const sent = this.sendResponseCallback(response);
-      console.log('Response sent via WebSocket:', sent);
+    // ส่ง response กลับผ่าน WebSocket โดยตรง
+    if (this.sendWebSocketMessage) {
+      const sent = this.sendWebSocketMessage(response);
+      console.log('✅ Response sent via WebSocket:', sent, response);
+      
+      if (sent) {
+        console.log('✅ Response sent successfully via WebSocket:', response);
+      } else {
+        console.error('❌ Failed to send response via WebSocket');
+      }
     } else {
-      console.warn('No sendResponse callback available, response not sent to server');
+      console.warn('No WebSocket sendMessage callback available, response not sent to server');
     }
     
     // Send debug message if debug mode is enabled
