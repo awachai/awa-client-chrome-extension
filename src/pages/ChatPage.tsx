@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Bot, Send, Wifi, WifiOff, RotateCcw, User } from 'lucide-react';
+import { Bot, Send, Wifi, WifiOff, RotateCcw, User, Bug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -28,6 +29,7 @@ const ChatPage = () => {
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [inputMessage, setInputMessage] = React.useState('');
   const [isProcessing, setIsProcessing] = React.useState(false);
+  const [debugMode, setDebugMode] = React.useState(false);
   const { toast } = useToast();
   const { authData, logout } = useAuth();
 
@@ -48,7 +50,7 @@ const ChatPage = () => {
   };
 
   // WebSocket connection with auth data
-  const { isConnected, messages: wsMessages, error: wsError, sendMessage, retry, clearError } = useWebSocket('nueng', authData);
+  const { isConnected, messages: wsMessages, error: wsError, sendMessage, retry, clearError, tabId, room } = useWebSocket('nueng', authData);
 
   const commandHandler = new CommandHandler({
     onTextMessage: (message: string) => {
@@ -187,6 +189,15 @@ const ChatPage = () => {
             </div>
           </div>
           <div className="flex items-center space-x-2">
+            <Button 
+              variant={debugMode ? "default" : "outline"} 
+              size="sm" 
+              onClick={() => setDebugMode(!debugMode)}
+              className={debugMode ? "bg-orange-500 hover:bg-orange-600" : ""}
+            >
+              <Bug className="h-4 w-4 mr-1" />
+              Debug
+            </Button>
             {wsError && (
               <Button variant="outline" size="sm" onClick={retry}>
                 <RotateCcw className="h-4 w-4 mr-1" />
@@ -198,6 +209,46 @@ const ChatPage = () => {
             </Button>
           </div>
         </div>
+        
+        {/* Debug Panel */}
+        {debugMode && (
+          <div className="mt-4 p-3 bg-gray-100 rounded-lg">
+            <h3 className="text-sm font-semibold mb-2">Debug Information</h3>
+            <div className="grid grid-cols-2 gap-4 text-xs">
+              <div>
+                <strong>Connection Status:</strong> {isConnected ? 'Connected' : 'Disconnected'}
+              </div>
+              <div>
+                <strong>Tab ID:</strong> {tabId || 'N/A'}
+              </div>
+              <div>
+                <strong>Room:</strong> {room || 'N/A'}
+              </div>
+              <div>
+                <strong>WebSocket Messages:</strong> {wsMessages.length}
+              </div>
+              <div>
+                <strong>Auth Token:</strong> {authData?.token ? 'Present' : 'None'}
+              </div>
+              <div>
+                <strong>User:</strong> {authData?.room || 'nueng'}
+              </div>
+            </div>
+            
+            {wsMessages.length > 0 && (
+              <div className="mt-3">
+                <strong className="text-sm">Latest WebSocket Messages:</strong>
+                <div className="max-h-32 overflow-y-auto mt-1 bg-white p-2 rounded text-xs">
+                  {wsMessages.slice(-5).map((msg, index) => (
+                    <div key={index} className="mb-1 p-1 border-b border-gray-200 last:border-b-0">
+                      <div className="font-mono">{JSON.stringify(msg, null, 2)}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Messages */}
