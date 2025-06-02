@@ -89,23 +89,29 @@ const ChatPage = () => {
   });
 
   React.useEffect(() => {
-    console.log('=== WEBSOCKET MESSAGES DEBUG ===');
-    console.log('Total WebSocket messages:', wsMessages.length);
-    console.log('All WebSocket messages:', wsMessages);
+    console.log('🔍 === WEBSOCKET MESSAGES DEBUG START ===');
+    console.log('📊 Total WebSocket messages:', wsMessages.length);
+    console.log('📝 All WebSocket messages:', wsMessages);
     
     if (wsMessages.length > 0) {
       const latestMessage = wsMessages[wsMessages.length - 1];
-      console.log('=== PROCESSING LATEST MESSAGE ===');
-      console.log('Latest message:', latestMessage);
-      console.log('Message type:', typeof latestMessage);
-      console.log('tranType:', latestMessage.tranType);
-      console.log('type:', latestMessage.type);
-      console.log('action:', latestMessage.action);
+      console.log('🎯 === PROCESSING LATEST MESSAGE ===');
+      console.log('📨 Latest message:', latestMessage);
+      console.log('🔢 Message type:', typeof latestMessage);
+      console.log('⚡ tranType:', latestMessage.tranType);
+      console.log('📋 type:', latestMessage.type);
+      console.log('🎬 action:', latestMessage.action);
+      
+      // เพิ่ม console.log เพื่อ debug เงื่อนไข
+      console.log('🧪 === CONDITION CHECKS ===');
+      console.log('✅ Is tranType === "request"?', latestMessage.tranType === 'request');
+      console.log('✅ Is type === "command"?', latestMessage.type === 'command');
+      console.log('✅ Both conditions met?', latestMessage.tranType === 'request' && latestMessage.type === 'command');
       
       // ตรวจสอบว่าเป็น JSON command structure หรือไม่
       if (latestMessage.tranType === 'request' && latestMessage.type === 'command') {
         console.log('🎯 DETECTED JSON COMMAND - Processing...');
-        console.log('Command details:', {
+        console.log('🔧 Command details:', {
           action: latestMessage.action,
           selector: latestMessage.selector,
           message: latestMessage.message
@@ -124,15 +130,15 @@ const ChatPage = () => {
         
         // ตรวจสอบว่ามี Chrome Extension หรือไม่
         console.log('🔍 CHECKING CHROME EXTENSION...');
-        console.log('Chrome object:', typeof chrome);
-        console.log('Chrome runtime:', typeof chrome?.runtime);
-        console.log('Chrome runtime ID:', chrome?.runtime?.id);
+        console.log('🌐 Chrome object:', typeof chrome);
+        console.log('⚡ Chrome runtime:', typeof chrome?.runtime);
+        console.log('🆔 Chrome runtime ID:', chrome?.runtime?.id);
         
         // ส่งคำสั่งไปยัง Chrome Extension
         if (typeof chrome !== 'undefined' && chrome.runtime) {
           console.log('📤 SENDING TO CHROME EXTENSION...');
-          console.log('Tab ID:', tabId);
-          console.log('Room:', room);
+          console.log('🏷️ Tab ID:', tabId);
+          console.log('🏠 Room:', room);
           
           const commandPayload = {
             type: 'EXECUTE_DOM_COMMAND',
@@ -141,7 +147,7 @@ const ChatPage = () => {
             originalCommand: latestMessage
           };
           
-          console.log('Command payload:', commandPayload);
+          console.log('📦 Command payload:', commandPayload);
           
           chrome.runtime.sendMessage(commandPayload, (response) => {
             console.log('📥 CHROME EXTENSION RESPONSE:', response);
@@ -241,16 +247,24 @@ const ChatPage = () => {
           });
         }
       } else {
-        console.log('ℹ️ Not a command message, processing as regular message');
+        console.log('❓ Not a command message, processing as regular message');
+        console.log('🔍 Message details:', {
+          tranType: latestMessage.tranType,
+          type: latestMessage.type,
+          action: latestMessage.action
+        });
+        
         // สำหรับคำสั่งแบบอื่นๆ ที่ไม่ใช่ command
         if (latestMessage.tranType === 'request') {
-          console.log('Processing non-command request:', latestMessage);
+          console.log('🔄 Processing non-command request:', latestMessage);
           commandHandler.executeCommand(latestMessage);
         }
       }
     } else {
       console.log('ℹ️ No WebSocket messages yet');
     }
+    
+    console.log('🔚 === WEBSOCKET MESSAGES DEBUG END ===');
   }, [wsMessages, debugMode, tabId, room, sendMessage]);
 
   const handleSendMessage = async () => {
