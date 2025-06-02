@@ -54,13 +54,21 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
       const currentRoom = authData?.room || `room_${user}_${currentTabId}`;
       setRoom(currentRoom);
 
-      const wsUrl = getWebSocketUrl(user);
+      const baseWsUrl = getWebSocketUrl(user);
+      
+      // เพิ่ม token ใน query parameter ถ้ามี
+      let wsUrl = baseWsUrl;
+      if (authData?.token) {
+        const urlObj = new URL(wsUrl.replace('ws://', 'http://'));
+        urlObj.searchParams.append('authorization', authData.token);
+        wsUrl = urlObj.toString().replace('http://', 'ws://');
+      }
       
       console.log('Attempting WebSocket connection to:', wsUrl);
       console.log('Tab ID:', currentTabId);
       console.log('Room:', currentRoom);
       console.log('Auth Data:', authData);
-      console.log('Will send token in connection message:', authData?.token ? 'Yes' : 'No');
+      console.log('Token in URL:', authData?.token ? 'Yes' : 'No');
       
       isConnecting.current = true;
       ws.current = new WebSocket(wsUrl);
@@ -72,15 +80,14 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
         reconnectAttempts.current = 0;
         isConnecting.current = false;
 
-        // Send initial connection info with Authorization token
+        // Send initial connection info
         const connectionInfo = {
           tranType: 'auth',
           type: 'connection',
           action: 'connect',
-          message: 'Connected successfully with authorization',
+          message: 'Connected successfully',
           tab_id: currentTabId,
           room: currentRoom,
-          authorization: authData?.token ? `Bearer ${authData.token}` : null,
           data: {
             user: user,
             timestamp: new Date().toISOString(),
@@ -92,7 +99,7 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
         
         if (ws.current && ws.current.readyState === WebSocket.OPEN) {
           ws.current.send(JSON.stringify(connectionInfo));
-          console.log('Sent connection info to server with auth token:', connectionInfo);
+          console.log('Sent connection info to server:', connectionInfo);
         }
       };
 
