@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Bot, Send, Wifi, WifiOff, RotateCcw, User, Bug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -94,12 +93,121 @@ const ChatPage = () => {
       const latestMessage = wsMessages[wsMessages.length - 1];
       console.log('Processing latest WebSocket message:', latestMessage);
       
-      if (latestMessage.tranType === 'request') {
-        console.log('Processing command request:', latestMessage);
+      // ตรวจสอบว่าเป็น JSON command structure หรือไม่
+      if (latestMessage.tranType === 'request' && latestMessage.type === 'command') {
+        console.log('Received JSON command:', latestMessage);
+        
+        // แสดง debug message
+        if (debugMode) {
+          const debugMessage: Message = {
+            id: `debug-${Date.now()}`,
+            type: 'debug',
+            content: `Received command: ${latestMessage.action} on ${latestMessage.selector}`,
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, debugMessage]);
+        }
+        
+        // ส่งคำสั่งไปยัง Chrome Extension
+        if (typeof chrome !== 'undefined' && chrome.runtime) {
+          chrome.runtime.sendMessage({
+            type: 'EXECUTE_DOM_COMMAND',
+            command: latestMessage,
+            sidePanelTabId: tabId,
+            originalCommand: latestMessage
+          }, (response) => {
+            if (chrome.runtime.lastError) {
+              console.error('Chrome extension error:', chrome.runtime.lastError);
+              
+              // ส่ง error response กลับ
+              const errorResponse = {
+                tranType: 'response',
+                type: 'command',
+                action: latestMessage.action,
+                message: `error: ${chrome.runtime.lastError.message}`,
+                selector: latestMessage.selector || '',
+                tab_id: tabId,
+                room: room,
+                timestamp: new Date().toISOString()
+              };
+              
+              sendMessage(errorResponse);
+              
+              if (debugMode) {
+                const debugMessage: Message = {
+                  id: `debug-${Date.now()}`,
+                  type: 'debug',
+                  content: `Command failed: ${chrome.runtime.lastError.message}`,
+                  timestamp: new Date()
+                };
+                setMessages(prev => [...prev, debugMessage]);
+              }
+            } else {
+              console.log('Command executed successfully:', response);
+              
+              // ส่ง success response กลับ
+              const successResponse = {
+                tranType: 'response',
+                type: 'command',
+                action: latestMessage.action,
+                message: response?.success ? 'success' : (response?.error || 'unknown error'),
+                selector: latestMessage.selector || '',
+                tab_id: tabId,
+                room: room,
+                timestamp: new Date().toISOString()
+              };
+              
+              sendMessage(successResponse);
+              
+              if (debugMode) {
+                const debugMessage: Message = {
+                  id: `debug-${Date.now()}`,
+                  type: 'debug',
+                  content: `Command completed: ${successResponse.message}`,
+                  timestamp: new Date()
+                };
+                setMessages(prev => [...prev, debugMessage]);
+              }
+            }
+          });
+        } else {
+          console.warn('Chrome extension not available, using fallback command handler');
+          
+          // Fallback ไปใช้ CommandHandler แบบเดิม
+          commandHandler.executeCommand(latestMessage).then(result => {
+            if (result) {
+              const response = {
+                tranType: 'response',
+                type: 'command',
+                action: latestMessage.action,
+                message: result.success ? 'success' : (result.error || 'unknown error'),
+                selector: latestMessage.selector || '',
+                tab_id: tabId,
+                room: room,
+                timestamp: new Date().toISOString()
+              };
+              
+              sendMessage(response);
+              
+              if (debugMode) {
+                const debugMessage: Message = {
+                  id: `debug-${Date.now()}`,
+                  type: 'debug',
+                  content: `Fallback command completed: ${response.message}`,
+                  timestamp: new Date()
+                };
+                setMessages(prev => [...prev, debugMessage]);
+              }
+            }
+          });
+        }
+      } else if (latestMessage.tranType === 'request') {
+        // สำหรับคำสั่งแบบอื่นๆ ที่ไม่ใช่ command
+        console.log('Processing non-command request:', latestMessage);
         commandHandler.executeCommand(latestMessage);
       }
     }
-  }, [wsMessages]);
+  }, [wsMessages, debugMode, tabId, room, sendMessage]);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;

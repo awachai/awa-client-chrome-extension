@@ -19,6 +19,7 @@ PROJECT NOTES - AI WEB AGENT DEVELOPMENT
    - ระบบคำสั่งในรูปแบบ JSON สำหรับควบคุม DOM elements
    - รองรับคำสั่งต่างๆ เช่น click, highlight, scroll_to
    - ตัวอย่างคำสั่ง: {"tranType":"request","type":"command","action":"click","message":"","selector":"#fQuote > div:nth-child(4) > button"}
+   - **[UPDATED]** ระบบตอบกลับในรูปแบบ: {"tranType":"response","type":"command","action":"click","message":"success","selector":"#fQuote > div:nth-child(4) > button"}
 
 3. Chrome Extension Components
    - Background script (background.js)
@@ -38,20 +39,31 @@ PROJECT NOTES - AI WEB AGENT DEVELOPMENT
 
 ปัญหาปัจจุบัน:
 --------------
-- JSON command ที่ส่งไปไม่ทำงาน ต้องตรวจสอบ WebSocket connection และ command processing
+- **[FIXED]** JSON command ที่ส่งไปไม่ทำงาน - ได้เพิ่มการจัดการ JSON command structure แล้ว
 
 สถานะการพัฒนา:
 --------------
 - มี debug panel สำหรับตรวจสอบสถานะ WebSocket
 - มี authentication system
 - มี command handler structure
-- ต้องแก้ไขปัญหา JSON command execution
+- **[NEW]** เพิ่มระบบรับ-ส่ง JSON command ที่สมบูรณ์
+- **[NEW]** รองรับการส่ง response กลับ server ในรูปแบบ tranType: "response"
 
 คำแนะนำการใช้งาน:
 -----------------
 - เปิด debug mode เพื่อดูสถานะการเชื่อมต่อ
 - ตรวจสอบ WebSocket messages ใน debug panel
 - ตรวจสอบ console logs สำหรับ debugging
+- **[NEW]** ส่ง JSON command ในรูปแบบ {"tranType":"request","type":"command","action":"click","selector":"..."}
+
+การอัปเดตล่าสุด:
+---------------
+วันที่: 2025-06-02
+เวลา: 15:35 น.
+- เพิ่มการจัดการ JSON command structure ใน ChatPage
+- ระบบจะตรวจสอบ message ที่เป็น tranType:"request" และ type:"command"
+- เมื่อได้รับคำสั่ง จะส่งไปยัง Chrome Extension เพื่อดำเนินการ
+- ส่ง response กลับ server ในรูปแบบ tranType:"response" พร้อม message:"success" หรือ error
 
 หมายเหตุ:
 --------
