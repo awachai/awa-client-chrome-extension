@@ -1,9 +1,9 @@
-
 // Content Script - ทำงานบนหน้าเว็บจริง
 (function() {
   'use strict';
   
   console.log('AI Web Agent Content Script loading on:', window.location.href);
+  console.log('[AUTH_LOG] Content script initializing...');
 
   // ป้องกันการ inject ซ้ำโดยใช้ unique identifier
   const SCRIPT_ID = 'ai-web-agent-content-script-v4';
@@ -17,6 +17,7 @@
   // ทำเครื่องหมายว่า script ถูกโหลดแล้ว
   window[SCRIPT_ID] = true;
   console.log('Initializing content script...');
+  console.log('[AUTH_LOG] Content script marked as initialized');
 
   // ContentDOMUtils Class
   window.ContentDOMUtils = class ContentDOMUtils {
@@ -171,6 +172,11 @@
   window.ContentCommandHandler = class ContentCommandHandler {
     static async executeCommand(command) {
       console.log('Content Script executing command:', command);
+      console.log('[AUTH_LOG] Command execution initiated:', {
+        action: command.action,
+        timestamp: new Date().toISOString(),
+        url: window.location.href
+      });
 
       try {
         switch (command.action) {
@@ -193,10 +199,16 @@
             return this.scanElements();
           
           default:
+            console.log('[AUTH_LOG] Unknown command action:', command.action);
             return { success: false, error: `Unknown action: ${command.action}` };
         }
       } catch (error) {
         console.error('Command execution error:', error);
+        console.error('[AUTH_LOG] Command execution failed:', {
+          error: error.message,
+          action: command.action,
+          timestamp: new Date().toISOString()
+        });
         return { success: false, error: error.message };
       }
     }
@@ -433,10 +445,16 @@
   // Chrome Runtime Message Listener
   function handleMessage(message, sender, sendResponse) {
     console.log('Content script received message:', message);
+    console.log('[AUTH_LOG] Message received in content script:', {
+      type: message.type,
+      timestamp: new Date().toISOString(),
+      sender: sender.tab ? `Tab ${sender.tab.id}` : 'Unknown'
+    });
     
     // Handle console log messages from background script
     if (message.type === 'CONSOLE_LOG') {
       const logMessage = `[BACKGROUND → CONTENT] ${message.message}`;
+      console.log('[AUTH_LOG] Console log from background:', logMessage);
       switch (message.level) {
         case 'error':
           console.error(logMessage);
@@ -455,18 +473,29 @@
     
     // Handle ping/pong for checking if script is alive
     if (message.type === 'PING') {
+      console.log('[AUTH_LOG] PING received, sending PONG');
       sendResponse({ pong: true });
       return;
     }
     
     if (message.type === 'DOM_COMMAND') {
+      console.log('[AUTH_LOG] DOM command received:', message.command);
       window.ContentCommandHandler.executeCommand(message.command)
         .then(result => {
           console.log('Content script command result:', result);
+          console.log('[AUTH_LOG] Command execution completed:', {
+            success: result.success,
+            action: result.action,
+            timestamp: new Date().toISOString()
+          });
           sendResponse(result);
         })
         .catch(error => {
           console.error('Content script command error:', error);
+          console.error('[AUTH_LOG] Command execution error:', {
+            error: error.message,
+            timestamp: new Date().toISOString()
+          });
           sendResponse({ success: false, error: error.message });
         });
       
@@ -482,16 +511,19 @@
       // Ignore error if listener doesn't exist
     }
     chrome.runtime.onMessage.addListener(handleMessage);
+    console.log('[AUTH_LOG] Message listener added successfully');
   }
 
   // Send ready signal when DOM is fully loaded
   function sendReadySignal() {
     if (typeof chrome === 'undefined' || !chrome.runtime) {
       console.log('Chrome runtime not available, skipping ready signal');
+      console.log('[AUTH_LOG] Chrome runtime not available for ready signal');
       return;
     }
 
     try {
+      console.log('[AUTH_LOG] Sending ready signal to background script');
       chrome.runtime.sendMessage({
         type: 'CONTENT_SCRIPT_READY',
         url: window.location.href,
@@ -500,12 +532,15 @@
       }, (response) => {
         if (chrome.runtime.lastError) {
           console.log('Failed to send ready signal:', chrome.runtime.lastError.message);
+          console.log('[AUTH_LOG] Ready signal failed:', chrome.runtime.lastError.message);
         } else {
           console.log('Content script ready signal sent successfully');
+          console.log('[AUTH_LOG] Ready signal sent successfully:', response);
         }
       });
     } catch (error) {
       console.error('Error sending ready signal:', error);
+      console.error('[AUTH_LOG] Error sending ready signal:', error.message);
     }
   }
 
@@ -513,13 +548,16 @@
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       console.log('DOM loaded, sending ready signal');
+      console.log('[AUTH_LOG] DOM loaded, initializing ready signal');
       setTimeout(sendReadySignal, 100);
     });
   } else {
     console.log('DOM already loaded, sending ready signal immediately');
+    console.log('[AUTH_LOG] DOM already loaded, sending immediate ready signal');
     setTimeout(sendReadySignal, 100);
   }
 
   console.log('Content script initialization complete');
+  console.log('[AUTH_LOG] Content script initialization completed successfully');
 
 })(); // End of IIFE
