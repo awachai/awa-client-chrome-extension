@@ -94,7 +94,7 @@ const ChatPage = () => {
       
       if (latestMessage.tranType === 'request') {
         console.log('Processing command request:', latestMessage);
-        commandHandler.processMessage(latestMessage);
+        commandHandler.executeCommand(latestMessage);
       }
     }
   }, [wsMessages]);
