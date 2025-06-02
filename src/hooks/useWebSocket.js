@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getWebSocketUrl } from '../config/env';
 
-export const useWebSocket = (user = 'nueng') => {
+export const useWebSocket = (user = 'nueng', authData = null) => {
   const [isConnected, setIsConnected] = useState(false);
   const [messages, setMessages] = useState([]);
   const [error, setError] = useState(null);
@@ -49,13 +49,16 @@ export const useWebSocket = (user = 'nueng') => {
     try {
       // Get tab info before connecting
       const currentTabId = await getCurrentTabInfo();
-      const currentRoom = `room_${user}_${currentTabId}`;
+      
+      // Use room from authData if available, otherwise fallback to user-based room
+      const currentRoom = authData?.room || `room_${user}_${currentTabId}`;
       setRoom(currentRoom);
 
       const wsUrl = getWebSocketUrl(user);
       console.log('Attempting WebSocket connection to:', wsUrl);
       console.log('Tab ID:', currentTabId);
       console.log('Room:', currentRoom);
+      console.log('Auth Data:', authData);
       
       isConnecting.current = true;
       ws.current = new WebSocket(wsUrl);
@@ -75,10 +78,12 @@ export const useWebSocket = (user = 'nueng') => {
           message: 'Connected successfully',
           tab_id: currentTabId,
           room: currentRoom,
+          token: authData?.token || null,
           data: {
             user: user,
             timestamp: new Date().toISOString(),
-            userAgent: navigator.userAgent
+            userAgent: navigator.userAgent,
+            authenticated: !!authData
           }
         };
         
@@ -144,7 +149,7 @@ export const useWebSocket = (user = 'nueng') => {
       isConnecting.current = false;
       setError('Failed to create WebSocket connection');
     }
-  }, [user, getCurrentTabInfo]);
+  }, [user, authData, getCurrentTabInfo]);
 
   const disconnect = useCallback(() => {
     console.log('Disconnecting WebSocket...');
@@ -193,6 +198,7 @@ export const useWebSocket = (user = 'nueng') => {
       ...responseCommand,
       tab_id: tabId,
       room: room,
+      token: authData?.token || null,
       timestamp: new Date().toISOString()
     };
     
@@ -225,7 +231,7 @@ export const useWebSocket = (user = 'nueng') => {
     }
     
     return sent;
-  }, [sendMessage, tabId, room]);
+  }, [sendMessage, tabId, room, authData]);
 
   const clearError = useCallback(() => {
     setError(null);
