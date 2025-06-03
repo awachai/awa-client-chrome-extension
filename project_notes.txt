@@ -61,19 +61,20 @@ PROJECT NOTES - AI WEB AGENT DEVELOPMENT
 - **[FIXED]** Console logs เยอะเกินไป - ได้ทำความสะอาด logs แล้ว เหลือเฉพาะที่จำเป็น
 - **[FIXED]** Mobile responsive และ file attachment - ได้เพิ่มกลับมาแล้ว
 - **[FIXED 2025-06-03]** ปัญหาการตรวจสอบ JSON command ใน ChatPage.tsx - แก้ไขแล้วและระบบทำงานปกติ
+- **[FIXED 2025-06-03]** เพิ่ม Drag and Drop file functionality - รองรับการลากวางไฟล์รูปภาพ
 
 การแก้ไขล่าสุด (2025-06-03):
 ============================
 
-### ปัญหาที่พบ:
+### ปัญหาที่พบเมื่อก่อน:
 - ส่ง command มาแล้วระบบไม่ทำงาน
 - การตรวจสอบ JSON command structure ใน ChatPage.tsx ไม่ถูกต้อง
 
-### สาเหตุหลัก:
+### สาเหตุหลัก (เก่า):
 - ใน ChatPage.tsx useEffect ที่ handle WebSocket messages มีการตรวจสอบ `message.tranType`, `message.type`, และ `message.action` ไม่ครบถ้วน
 - เงื่อนไขการตรวจสอบไม่ตรงกับ JSON command format ที่ส่งมาจาก server
 
-### การแก้ไข:
+### การแก้ไข (เก่า):
 1. **ปรับปรุงการตรวจสอบ JSON command ใน ChatPage.tsx:**
    ```javascript
    // แก้ไขจาก
@@ -87,10 +88,57 @@ PROJECT NOTES - AI WEB AGENT DEVELOPMENT
    - เพิ่ม console.log เพื่อติดตาม message ที่เข้ามา
    - เพิ่มการตรวจสอบ field แต่ละตัวอย่างละเอียด
 
-3. **ผลลัพธ์:**
-   - ระบบ JSON command ทำงานได้ปกติแล้ว
-   - สามารถส่งคำสั่ง click, highlight, scroll_to ได้สำเร็จ
-   - Chrome Extension ดำเนินการบน DOM ได้ตามคำสั่ง
+### การอัปเดตใหม่ล่าสุด - Drag and Drop Functionality (2025-06-03):
+========================================================================
+
+**ฟีเจอร์ที่เพิ่ม:**
+- รองรับการลากวางไฟล์รูปภาพ (Drag and Drop) ใน ChatPage
+- แสดง visual overlay เมื่อลากไฟล์เข้ามา
+- รองรับไฟล์รูปภาพทุกประเภท (image/*) ขนาดสูงสุด 10MB
+
+**Implementation Details:**
+1. **Event Handlers ที่เพิ่ม:**
+   - `handleDragEnter`: จัดการเมื่อเริ่มลากไฟล์เข้ามา
+   - `handleDragOver`: ป้องกัน default behavior และแสดง visual feedback
+   - `handleDragLeave`: จัดการเมื่อลากไฟล์ออกจากพื้นที่
+   - `handleDrop`: ประมวลผลไฟล์ที่ถูกวาง
+
+2. **State Management:**
+   - เพิ่ม `isDragOver` state เพื่อควบคุม visual overlay
+   - ใช้ `dragCounter` เพื่อจัดการ dragenter/dragleave events อย่างถูกต้อง
+
+3. **Validation:**
+   - ตรวจสอบประเภทไฟล์ (เฉพาะรูปภาพ)
+   - ตรวจสอบขนาดไฟล์ (สูงสุด 10MB)
+   - แสดงข้อความแจ้งเตือนหากไฟล์ไม่ถูกต้อง
+
+4. **UI/UX Improvements:**
+   - แสดง overlay สีฟ้าพร้อมข้อความแนะนำเมื่อลากไฟล์
+   - รองรับทั้งการเลือกไฟล์แบบปกติและ drag & drop
+   - ป้องกันการเปิดไฟล์ใน browser เมื่อ drop นอกพื้นที่
+
+**Technical Implementation:**
+```javascript
+// Event handler สำหรับ drag and drop
+const handleDrop = (e) => {
+  e.preventDefault();
+  setIsDragOver(false);
+  setDragCounter(0);
+  
+  const files = Array.from(e.dataTransfer.files);
+  const imageFiles = files.filter(file => file.type.startsWith('image/'));
+  
+  if (imageFiles.length > 0) {
+    handleFileSelect({ target: { files: imageFiles } });
+  }
+};
+```
+
+**ผลลัพธ์:**
+- ผู้ใช้สามารถลากวางไฟล์รูปภาพได้โดยตรง
+- มี visual feedback ที่ชัดเจน
+- ระบบ validation ทำงานได้ถูกต้อง
+- รองรับทั้ง desktop และ mobile (ในบราวเซอร์ที่รองรับ)
 
 ### บทเรียนสำคัญ:
 **การตรวจสอบ JSON Command ต้องทำอย่างถูกต้อง:**
@@ -98,6 +146,12 @@ PROJECT NOTES - AI WEB AGENT DEVELOPMENT
 - ต้องตรวจสอบ `type === 'command'` เพื่อระบุว่าเป็น command message
 - ต้องตรวจสอบ `action` ที่มีค่า เพื่อระบุการกระทำที่ต้องทำ
 - **หากขาดการตรวจสอบใดการตรวจสอบหนึ่ง command จะไม่ถูกประมวลผล**
+
+**การเพิ่ม Drag and Drop:**
+- ต้องจัดการ dragenter/dragleave อย่างระมัดระวังเพื่อป้องกัน flickering
+- ใช้ dragCounter เพื่อติดตาม nested drag events
+- ต้อง preventDefault() ใน dragover และ drop events
+- ควรมี visual feedback ที่ชัดเจนสำหรับผู้ใช้
 
 ### Template การตรวจสอบ JSON Command ที่ถูกต้อง:
 ```javascript
@@ -129,6 +183,48 @@ useEffect(() => {
 }, [wsMessage]);
 ```
 
+### Template สำหรับ Drag and Drop Implementation:
+```javascript
+// State management
+const [isDragOver, setIsDragOver] = useState(false);
+const [dragCounter, setDragCounter] = useState(0);
+
+// Event handlers
+const handleDragEnter = (e) => {
+  e.preventDefault();
+  setDragCounter(prev => prev + 1);
+  setIsDragOver(true);
+};
+
+const handleDragLeave = (e) => {
+  e.preventDefault();
+  setDragCounter(prev => {
+    const newCounter = prev - 1;
+    if (newCounter === 0) {
+      setIsDragOver(false);
+    }
+    return newCounter;
+  });
+};
+
+const handleDragOver = (e) => {
+  e.preventDefault();
+};
+
+const handleDrop = (e) => {
+  e.preventDefault();
+  setIsDragOver(false);
+  setDragCounter(0);
+  
+  const files = Array.from(e.dataTransfer.files);
+  const imageFiles = files.filter(file => file.type.startsWith('image/'));
+  
+  if (imageFiles.length > 0) {
+    handleFileSelect({ target: { files: imageFiles } });
+  }
+};
+```
+
 สถานะการพัฒนา:
 --------------
 - มี debug panel สำหรับตรวจสอบสถานะ WebSocket
@@ -139,6 +235,7 @@ useEffect(() => {
 - **[WORKING]** ระบบ logging ส่งไปยัง content script
 - **[WORKING]** Mobile Responsive Design
 - **[WORKING]** ระบบแนบไฟล์รูปภาพ
+- **[WORKING]** Drag and Drop file functionality - ลากวางไฟล์ได้แล้ว
 - **[WORKING]** Chrome Extension integration กับ DOM manipulation
 
 รายละเอียดหน้าต่างๆ ในระบบ:
@@ -170,6 +267,8 @@ useEffect(() => {
    - แสดง preview ไฟล์ที่เลือก
    - สามารถลบไฟล์ที่เลือกได้
    - แปลงไฟล์เป็น base64 ก่อนส่ง
+   - **[NEW]** รองรับ Drag and Drop - ลากวางไฟล์ได้โดยตรง
+   - **[NEW]** แสดง visual overlay เมื่อลากไฟล์เข้ามา
 
    Debug Mode:
    - แสดงข้อมูลการเชื่อมต่อ WebSocket
@@ -185,6 +284,7 @@ useEffect(() => {
    - ปุ่มต่างๆ ปรับขนาดและซ่อนข้อความบางส่วน
    - ข้อความในแชทปรับ max-width ให้เหมาะสม
    - File preview ปรับให้แสดงได้ดีบน mobile
+   - Drag and Drop รองรับบน mobile browser ที่รองรับ
 
    Message Types:
    - User messages: ข้อความจากผู้ใช้ (สีฟ้า)
@@ -229,16 +329,18 @@ Chrome Extension Components:
 - ตรวจสอบ WebSocket messages ใน debug panel
 - ตรวจสอบ console logs สำหรับ debugging (logs จะแสดงใน tab ที่มี content script)
 - **[WORKING]** ส่ง JSON command ในรูปแบบ {"tranType":"request","type":"command","action":"click","selector":"..."}
+- **[NEW]** ลากวางไฟล์รูปภาพเข้าในหน้าแชทได้โดยตรง
 
 การอัปเดตล่าสุด:
 ---------------
 วันที่: 2025-06-03
-เวลา: 11:45 น.
+เวลา: 14:30 น.
 - **[FINAL FIX]** แก้ไขปัญหาการตรวจสอบ JSON command structure ใน ChatPage.tsx
 - ระบบ JSON command ทำงานได้สมบูรณ์แล้ว
 - สามารถส่งคำสั่ง click, highlight, scroll_to ได้ตามปกติ
 - เพิ่มการ log เพื่อ debug และติดตามการทำงาน
-- **ระบบ AI Web Agent พร้อมใช้งานเต็มรูปแบบแล้ว**
+- **[NEW 2025-06-03]** เพิ่ม Drag and Drop functionality สำหรับไฟล์รูปภาพ
+- **ระบบ AI Web Agent พร้อมใช้งานเต็มรูปแบบแล้ว รวมถึงการลากวางไฟล์**
 
 Technical Architecture:
 -----------------------
@@ -248,10 +350,13 @@ Technical Architecture:
 - Content Script รันบนหน้าเว็บเป้าหมาย
 - Background Script เป็นตัวกลางประมวลผลคำสั่ง
 - **[WORKING]** JSON-based command protocol สำหรับการสั่งงาน
+- **[WORKING]** File handling system with drag and drop support
 
 หมายเหตุ:
 --------
 - ไฟล์นี้จะถูกอัปเดตทุกครั้งที่มีการสั่งให้จำข้อมูลใหม่
 - จะมีการบันทึกวันที่และเวลาของการอัปเดต
-- ChatPage.tsx มีขนาด 557 บรรทัด ควรพิจารณา refactor ในอนาคต
+- ChatPage.tsx มีขนาด 559 บรรทัด ควรพิจารณา refactor ในอนาคต
 - **สำคัญ: การตรวจสอบ JSON command ใน useEffect ต้องทำอย่างถูกต้องตาม template ข้างต้น**
+- **สำคัญ: การเพิ่ม drag and drop ต้องใช้ dragCounter เพื่อจัดการ nested events**
+- **ระบบพร้อมใช้งานครบถ้วนแล้ว รวมถึงฟีเจอร์ drag and drop ไฟล์**
