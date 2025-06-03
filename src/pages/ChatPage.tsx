@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Bot, Send, Wifi, WifiOff, RotateCcw, User, Bug, Paperclip, X, Upload, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -161,7 +160,16 @@ const ChatPage = () => {
       }
       
       if (validFiles.length > 0) {
+        // Create preview URLs for drag & dropped files
+        const newPreviewUrls: {[key: string]: string} = {};
+        validFiles.forEach(file => {
+          const key = `${file.name}-${file.size}-${file.lastModified}`;
+          newPreviewUrls[key] = createFilePreviewUrl(file);
+        });
+        
+        setFilePreviewUrls(prev => ({ ...prev, ...newPreviewUrls }));
         setSelectedFiles(prev => [...prev, ...validFiles]);
+        
         toast({
           title: "แนบไฟล์สำเร็จ",
           description: `แนบไฟล์ ${validFiles.length} ไฟล์แล้ว`,
@@ -635,7 +643,7 @@ const ChatPage = () => {
                   {message.imageUrl && (
                     <Dialog>
                       <DialogTrigger asChild>
-                        <div className="mt-2 cursor-pointer group">
+                        <div className="mt-2 cursor-pointer group relative">
                           <img 
                             src={message.imageUrl} 
                             alt="Generated content" 
