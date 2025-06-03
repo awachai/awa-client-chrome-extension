@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Bot, Send, Wifi, WifiOff, RotateCcw, User, Bug } from 'lucide-react';
+import { Bot, Send, Wifi, WifiOff, RotateCcw, User, Bug, Paperclip, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -9,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { CommandHandler } from '@/utils/commandHandler';
 import { useAuth } from '@/hooks/useAuth';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Message {
   id: string;
@@ -29,8 +31,11 @@ const ChatPage = () => {
   const [inputMessage, setInputMessage] = React.useState('');
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [debugMode, setDebugMode] = React.useState(false);
+  const [selectedFiles, setSelectedFiles] = React.useState<File[]>([]);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { authData, logout } = useAuth();
+  const isMobile = useIsMobile();
 
   // Helper function to send console logs to content script
   const sendConsoleLog = (message: string, level: 'log' | 'info' | 'warn' | 'error' = 'log') => {
@@ -61,6 +66,46 @@ const ChatPage = () => {
     } catch {
       return { isJson: false };
     }
+  };
+
+  // File handling functions
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files) {
+      const newFiles = Array.from(files).filter(file => {
+        if (file.type.startsWith('image/')) {
+          return file.size <= 10 * 1024 * 1024; // 10MB limit
+        }
+        return false;
+      });
+      
+      if (newFiles.length !== files.length) {
+        toast({
+          title: "ไฟล์บางไฟล์ไม่สามารถแนบได้",
+          description: "รองรับเฉพาะรูปภาพที่มีขนาดไม่เกิน 10MB",
+          variant: "destructive",
+        });
+      }
+      
+      setSelectedFiles(prev => [...prev, ...newFiles]);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   };
 
   // WebSocket connection with auth data
@@ -238,7 +283,7 @@ const ChatPage = () => {
   }, [wsMessages, debugMode, tabId, room, sendMessage]);
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim() && selectedFiles.length === 0) return;
     if (!isConnected) {
       toast({
         title: "ไม่ได้เชื่อมต่อ",
@@ -253,7 +298,7 @@ const ChatPage = () => {
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       type: 'user',
-      content: inputMessage,
+      content: inputMessage || (selectedFiles.length > 0 ? `แนบไฟล์ ${selectedFiles.length} ไฟล์` : ''),
       timestamp: new Date()
     };
     
@@ -261,6 +306,20 @@ const ChatPage = () => {
     
     const parseResult = parseJsonFromText(inputMessage);
     const attachments: Attachment[] = [];
+    
+    // Convert files to base64
+    for (const file of selectedFiles) {
+      try {
+        const base64Content = await convertFileToBase64(file);
+        attachments.push({
+          type: 'image',
+          content: base64Content,
+          name: file.name
+        });
+      } catch (error) {
+        console.error('Error converting file to base64:', error);
+      }
+    }
     
     const wsMessage = {
       type: 'user_message',
@@ -286,6 +345,10 @@ const ChatPage = () => {
     }
     
     setInputMessage('');
+    setSelectedFiles([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
     setIsProcessing(false);
   };
 
@@ -297,93 +360,75 @@ const ChatPage = () => {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 p-4">
+      <div className="bg-white border-b border-gray-200 p-3 md:p-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Bot className="h-8 w-8 text-blue-600" />
+          <div className="flex items-center space-x-2 md:space-x-3">
+            <Bot className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
             <div>
-              <h1 className="text-xl font-kanit font-semibold">AI Web Agent</h1>
-              <div className="flex items-center space-x-2">
+              <h1 className="text-lg md:text-xl font-kanit font-semibold">AI Web Agent</h1>
+              <div className="flex items-center space-x-1 md:space-x-2 flex-wrap">
                 {isConnected ? (
-                  <Badge variant="default" className="bg-green-100 text-green-800">
-                    <Wifi className="h-3 w-3 mr-1" />
+                  <Badge variant="default" className="bg-green-100 text-green-800 text-xs">
+                    <Wifi className="h-2 w-2 md:h-3 md:w-3 mr-1" />
                     เชื่อมต่อแล้ว
                   </Badge>
                 ) : (
-                  <Badge variant="destructive">
-                    <WifiOff className="h-3 w-3 mr-1" />
+                  <Badge variant="destructive" className="text-xs">
+                    <WifiOff className="h-2 w-2 md:h-3 md:w-3 mr-1" />
                     ไม่ได้เชื่อมต่อ
                   </Badge>
                 )}
                 {authData && (
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                    <User className="h-3 w-3 mr-1" />
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 text-xs">
+                    <User className="h-2 w-2 md:h-3 md:w-3 mr-1" />
                     {authData.room}
                   </Badge>
                 )}
               </div>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1 md:space-x-2">
             <Button 
               variant={debugMode ? "default" : "outline"} 
               size="sm" 
               onClick={() => setDebugMode(!debugMode)}
-              className={debugMode ? "bg-orange-500 hover:bg-orange-600" : ""}
+              className={`text-xs ${debugMode ? "bg-orange-500 hover:bg-orange-600" : ""}`}
             >
-              <Bug className="h-4 w-4 mr-1" />
-              Debug
+              <Bug className="h-3 w-3 md:h-4 md:w-4 mr-1" />
+              {isMobile ? '' : 'Debug'}
             </Button>
             {wsError && (
-              <Button variant="outline" size="sm" onClick={retry}>
-                <RotateCcw className="h-4 w-4 mr-1" />
-                ลองใหม่
+              <Button variant="outline" size="sm" onClick={retry} className="text-xs">
+                <RotateCcw className="h-3 w-3 md:h-4 md:w-4 mr-1" />
+                {isMobile ? '' : 'ลองใหม่'}
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={handleLogout}>
-              ออกจากระบบ
+            <Button variant="outline" size="sm" onClick={handleLogout} className="text-xs">
+              {isMobile ? 'ออก' : 'ออกจากระบบ'}
             </Button>
           </div>
         </div>
         
-        {/* Debug Panel */}
+        {/* Debug Panel - Mobile Optimized */}
         {debugMode && (
-          <div className="mt-4 p-3 bg-gray-100 rounded-lg">
-            <h3 className="text-sm font-semibold mb-2">Debug Information</h3>
-            <div className="grid grid-cols-2 gap-4 text-xs">
-              <div>
-                <strong>Connection Status:</strong> {isConnected ? 'Connected' : 'Disconnected'}
-              </div>
-              <div>
-                <strong>Tab ID:</strong> {tabId || 'N/A'}
-              </div>
-              <div>
-                <strong>Room:</strong> {room || 'N/A'}
-              </div>
-              <div>
-                <strong>WebSocket Messages:</strong> {wsMessages.length}
-              </div>
-              <div>
-                <strong>Auth Token:</strong> {authData?.token ? 'Present' : 'None'}
-              </div>
-              <div>
-                <strong>User:</strong> {authData?.room || 'nueng'}
-              </div>
-              <div>
-                <strong>Chrome Extension:</strong> {typeof chrome !== 'undefined' && chrome.runtime ? 'Available' : 'Not Available'}
-              </div>
-              <div>
-                <strong>Chrome Runtime ID:</strong> {chrome?.runtime?.id || 'N/A'}
-              </div>
+          <div className="mt-3 p-2 md:p-3 bg-gray-100 rounded-lg">
+            <h3 className="text-xs md:text-sm font-semibold mb-2">Debug Information</h3>
+            <div className={`grid ${isMobile ? 'grid-cols-1 gap-2' : 'grid-cols-2 gap-4'} text-xs`}>
+              <div><strong>Connection:</strong> {isConnected ? 'Connected' : 'Disconnected'}</div>
+              <div><strong>Tab ID:</strong> {tabId || 'N/A'}</div>
+              <div><strong>Room:</strong> {room || 'N/A'}</div>
+              <div><strong>Messages:</strong> {wsMessages.length}</div>
+              <div><strong>Token:</strong> {authData?.token ? 'Present' : 'None'}</div>
+              <div><strong>Extension:</strong> {typeof chrome !== 'undefined' && chrome.runtime ? 'Available' : 'Not Available'}</div>
             </div>
             
             {wsMessages.length > 0 && (
-              <div className="mt-3">
-                <strong className="text-sm">Latest WebSocket Messages:</strong>
-                <div className="max-h-32 overflow-y-auto mt-1 bg-white p-2 rounded text-xs">
-                  {wsMessages.slice(-5).map((msg, index) => (
+              <div className="mt-2">
+                <strong className="text-xs">Latest Messages:</strong>
+                <div className="max-h-24 md:max-h-32 overflow-y-auto mt-1 bg-white p-2 rounded text-xs">
+                  {wsMessages.slice(-3).map((msg, index) => (
                     <div key={index} className="mb-1 p-1 border-b border-gray-200 last:border-b-0">
-                      <div className="font-mono">{JSON.stringify(msg, null, 2)}</div>
+                      <div className="font-mono break-all">{JSON.stringify(msg, null, isMobile ? 0 : 2)}</div>
                     </div>
                   ))}
                 </div>
@@ -394,30 +439,30 @@ const ChatPage = () => {
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4 max-w-4xl mx-auto">
+      <ScrollArea className="flex-1 p-2 md:p-4">
+        <div className="space-y-3 md:space-y-4 max-w-4xl mx-auto">
           {messages.map((message) => (
-            <Card key={message.id} className={`p-4 ${
+            <Card key={message.id} className={`p-3 md:p-4 ${
               message.type === 'user' 
-                ? 'bg-blue-50 border-blue-200 ml-auto max-w-md' 
+                ? 'bg-blue-50 border-blue-200 ml-auto max-w-sm md:max-w-md' 
                 : message.type === 'debug'
                 ? 'bg-yellow-50 border-yellow-200'
-                : 'bg-white border-gray-200 mr-auto max-w-md'
+                : 'bg-white border-gray-200 mr-auto max-w-sm md:max-w-md'
             }`}>
-              <div className="flex items-start space-x-3">
+              <div className="flex items-start space-x-2 md:space-x-3">
                 {message.type === 'user' ? (
-                  <User className="h-5 w-5 text-blue-600 mt-1" />
+                  <User className="h-4 w-4 md:h-5 md:w-5 text-blue-600 mt-1 flex-shrink-0" />
                 ) : (
-                  <Bot className="h-5 w-5 text-gray-600 mt-1" />
+                  <Bot className="h-4 w-4 md:h-5 md:w-5 text-gray-600 mt-1 flex-shrink-0" />
                 )}
-                <div className="flex-1">
-                  <div className="text-sm text-gray-500 mb-1">
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs md:text-sm text-gray-500 mb-1">
                     {message.type === 'user' ? 'คุณ' : message.type === 'debug' ? 'Debug' : 'AI'}
                     <span className="ml-2">
                       {message.timestamp.toLocaleTimeString('th-TH')}
                     </span>
                   </div>
-                  <div className="text-gray-900 whitespace-pre-wrap">
+                  <div className="text-sm md:text-base text-gray-900 whitespace-pre-wrap break-words">
                     {message.content}
                   </div>
                   {message.imageUrl && (
@@ -436,8 +481,31 @@ const ChatPage = () => {
         </div>
       </ScrollArea>
 
+      {/* File Preview */}
+      {selectedFiles.length > 0 && (
+        <div className="bg-white border-t border-gray-200 p-2 md:p-3">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex flex-wrap gap-2">
+              {selectedFiles.map((file, index) => (
+                <div key={index} className="flex items-center bg-gray-100 rounded-lg p-2 text-xs md:text-sm">
+                  <span className="truncate max-w-24 md:max-w-32">{file.name}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeFile(index)}
+                    className="ml-2 p-1 h-auto"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Input */}
-      <div className="bg-white border-t border-gray-200 p-4">
+      <div className="bg-white border-t border-gray-200 p-2 md:p-4">
         <div className="max-w-4xl mx-auto">
           <div className="flex space-x-2">
             <Input
@@ -446,17 +514,36 @@ const ChatPage = () => {
               placeholder="พิมพ์ข้อความหรือ JSON command..."
               onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
               disabled={!isConnected || isProcessing}
-              className="flex-1"
+              className="flex-1 text-sm md:text-base"
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={handleFileSelect}
+              className="hidden"
             />
             <Button 
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={!isConnected || isProcessing}
+              size="sm"
+              className="flex-shrink-0"
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+            <Button 
               onClick={handleSendMessage}
-              disabled={!isConnected || isProcessing || !inputMessage.trim()}
+              disabled={!isConnected || isProcessing || (!inputMessage.trim() && selectedFiles.length === 0)}
+              size="sm"
+              className="flex-shrink-0"
             >
               <Send className="h-4 w-4" />
             </Button>
           </div>
           {wsError && (
-            <div className="mt-2 text-sm text-red-600 bg-red-50 p-2 rounded">
+            <div className="mt-2 text-xs md:text-sm text-red-600 bg-red-50 p-2 rounded">
               {wsError}
             </div>
           )}
