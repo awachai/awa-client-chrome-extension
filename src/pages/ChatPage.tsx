@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Bot, Send, Wifi, WifiOff, RotateCcw, User, Bug, Paperclip, X } from 'lucide-react';
+import { Bot, Send, Wifi, WifiOff, RotateCcw, User, Bug, Paperclip, X, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -31,6 +32,7 @@ const ChatPage = () => {
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [debugMode, setDebugMode] = React.useState(false);
   const [selectedFiles, setSelectedFiles] = React.useState<File[]>([]);
+  const [isDragOver, setIsDragOver] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { authData, logout } = useAuth();
@@ -68,17 +70,22 @@ const ChatPage = () => {
   };
 
   // File handling functions
+  const validateFiles = (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    return fileArray.filter(file => {
+      if (file.type.startsWith('image/')) {
+        return file.size <= 10 * 1024 * 1024; // 10MB limit
+      }
+      return false;
+    });
+  };
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files) {
-      const newFiles = Array.from(files).filter(file => {
-        if (file.type.startsWith('image/')) {
-          return file.size <= 10 * 1024 * 1024; // 10MB limit
-        }
-        return false;
-      });
+      const validFiles = validateFiles(files);
       
-      if (newFiles.length !== files.length) {
+      if (validFiles.length !== files.length) {
         toast({
           title: "ไฟล์บางไฟล์ไม่สามารถแนบได้",
           description: "รองรับเฉพาะรูปภาพที่มีขนาดไม่เกิน 10MB",
@@ -86,7 +93,60 @@ const ChatPage = () => {
         });
       }
       
-      setSelectedFiles(prev => [...prev, ...newFiles]);
+      setSelectedFiles(prev => [...prev, ...validFiles]);
+    }
+  };
+
+  // Drag and Drop handlers
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Only set dragOver to false if we're leaving the entire drop zone
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const validFiles = validateFiles(files);
+      
+      if (validFiles.length !== files.length) {
+        toast({
+          title: "ไฟล์บางไฟล์ไม่สามารถแนบได้",
+          description: "รองรับเฉพาะรูปภาพที่มีขนาดไม่เกิน 10MB",
+          variant: "destructive",
+        });
+      }
+      
+      if (validFiles.length > 0) {
+        setSelectedFiles(prev => [...prev, ...validFiles]);
+        toast({
+          title: "แนบไฟล์สำเร็จ",
+          description: `แนบไฟล์ ${validFiles.length} ไฟล์แล้ว`,
+        });
+      }
     }
   };
 
@@ -360,7 +420,24 @@ const ChatPage = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div 
+      className="flex flex-col h-screen bg-gray-50"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {isDragOver && (
+        <div className="fixed inset-0 bg-blue-500 bg-opacity-20 z-50 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-lg shadow-lg border-2 border-dashed border-blue-500 text-center">
+            <Upload className="h-12 w-12 text-blue-500 mx-auto mb-2" />
+            <p className="text-lg font-semibold text-blue-700">ปล่อยไฟล์ที่นี่เพื่อแนบ</p>
+            <p className="text-sm text-gray-600">รองรับรูปภาพขนาดไม่เกิน 10MB</p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white border-b border-gray-200 p-3 md:p-4">
         <div className="flex items-center justify-between">
@@ -513,7 +590,7 @@ const ChatPage = () => {
             <Input
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              placeholder="พิมพ์ข้อความหรือ JSON command..."
+              placeholder="พิมพ์ข้อความหรือ JSON command... หรือลากวางไฟล์ลงในหน้าต่าง"
               onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
               disabled={!isConnected || isProcessing}
               className="flex-1 text-sm md:text-base"
