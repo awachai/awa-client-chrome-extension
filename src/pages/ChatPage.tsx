@@ -1,11 +1,12 @@
 
 import React from 'react';
-import { Bot, Send, Wifi, WifiOff, RotateCcw, User, Bug, Paperclip, X, Upload } from 'lucide-react';
+import { Bot, Send, Wifi, WifiOff, RotateCcw, User, Bug, Paperclip, X, Upload, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { CommandHandler } from '@/utils/commandHandler';
@@ -18,6 +19,12 @@ interface Message {
   content: string;
   timestamp: Date;
   imageUrl?: string;
+  attachments?: Array<{
+    type: 'image';
+    content: string;
+    name: string;
+    url: string;
+  }>;
 }
 
 interface Attachment {
@@ -33,6 +40,7 @@ const ChatPage = () => {
   const [debugMode, setDebugMode] = React.useState(false);
   const [selectedFiles, setSelectedFiles] = React.useState<File[]>([]);
   const [isDragOver, setIsDragOver] = React.useState(false);
+  const [filePreviewUrls, setFilePreviewUrls] = React.useState<{[key: string]: string}>({});
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { authData, logout } = useAuth();
@@ -80,6 +88,10 @@ const ChatPage = () => {
     });
   };
 
+  const createFilePreviewUrl = (file: File): string => {
+    return URL.createObjectURL(file);
+  };
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files) {
@@ -93,6 +105,14 @@ const ChatPage = () => {
         });
       }
       
+      // Create preview URLs for new files
+      const newPreviewUrls: {[key: string]: string} = {};
+      validFiles.forEach(file => {
+        const key = `${file.name}-${file.size}-${file.lastModified}`;
+        newPreviewUrls[key] = createFilePreviewUrl(file);
+      });
+      
+      setFilePreviewUrls(prev => ({ ...prev, ...newPreviewUrls }));
       setSelectedFiles(prev => [...prev, ...validFiles]);
     }
   };
@@ -151,6 +171,20 @@ const ChatPage = () => {
   };
 
   const removeFile = (index: number) => {
+    const fileToRemove = selectedFiles[index];
+    const key = `${fileToRemove.name}-${fileToRemove.size}-${fileToRemove.lastModified}`;
+    
+    // Revoke the object URL to free memory
+    if (filePreviewUrls[key]) {
+      URL.revokeObjectURL(filePreviewUrls[key]);
+    }
+    
+    setFilePreviewUrls(prev => {
+      const newUrls = { ...prev };
+      delete newUrls[key];
+      return newUrls;
+    });
+    
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
@@ -357,11 +391,23 @@ const ChatPage = () => {
 
     setIsProcessing(true);
     
+    // Create attachments with preview URLs for the message
+    const messageAttachments = selectedFiles.map(file => {
+      const key = `${file.name}-${file.size}-${file.lastModified}`;
+      return {
+        type: 'image' as const,
+        content: '',
+        name: file.name,
+        url: filePreviewUrls[key] || ''
+      };
+    });
+    
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       type: 'user',
       content: inputMessage || (selectedFiles.length > 0 ? `แนบไฟล์ ${selectedFiles.length} ไฟล์` : ''),
-      timestamp: new Date()
+      timestamp: new Date(),
+      attachments: messageAttachments
     };
     
     setMessages(prev => [...prev, userMessage]);
@@ -407,7 +453,17 @@ const ChatPage = () => {
     }
     
     setInputMessage('');
+    
+    // Clean up file preview URLs
+    selectedFiles.forEach(file => {
+      const key = `${file.name}-${file.size}-${file.lastModified}`;
+      if (filePreviewUrls[key]) {
+        URL.revokeObjectURL(filePreviewUrls[key]);
+      }
+    });
+    
     setSelectedFiles([]);
+    setFilePreviewUrls({});
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -541,17 +597,63 @@ const ChatPage = () => {
                       {message.timestamp.toLocaleTimeString('th-TH')}
                     </span>
                   </div>
-                  <div className="text-sm md:text-base text-gray-900 whitespace-pre-wrap break-words">
-                    {message.content}
-                  </div>
-                  {message.imageUrl && (
-                    <div className="mt-2">
-                      <img 
-                        src={message.imageUrl} 
-                        alt="Generated content" 
-                        className="max-w-full h-auto rounded-lg border"
-                      />
+                  {message.content && (
+                    <div className="text-sm md:text-base text-gray-900 whitespace-pre-wrap break-words mb-2">
+                      {message.content}
                     </div>
+                  )}
+                  
+                  {/* Display message attachments */}
+                  {message.attachments && message.attachments.length > 0 && (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                      {message.attachments.map((attachment, index) => (
+                        <Dialog key={index}>
+                          <DialogTrigger asChild>
+                            <div className="relative cursor-pointer group">
+                              <img 
+                                src={attachment.url} 
+                                alt={attachment.name}
+                                className="w-full h-20 object-cover rounded-lg border group-hover:opacity-80 transition-opacity"
+                              />
+                              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity rounded-lg flex items-center justify-center">
+                                <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </div>
+                            </div>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-4xl max-h-[80vh] p-0">
+                            <img 
+                              src={attachment.url} 
+                              alt={attachment.name}
+                              className="w-full h-auto max-h-[75vh] object-contain"
+                            />
+                          </DialogContent>
+                        </Dialog>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {message.imageUrl && (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <div className="mt-2 cursor-pointer group">
+                          <img 
+                            src={message.imageUrl} 
+                            alt="Generated content" 
+                            className="max-w-full h-auto rounded-lg border group-hover:opacity-80 transition-opacity"
+                          />
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity rounded-lg flex items-center justify-center">
+                            <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </div>
+                        </div>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-4xl max-h-[80vh] p-0">
+                        <img 
+                          src={message.imageUrl} 
+                          alt="Generated content" 
+                          className="w-full h-auto max-h-[75vh] object-contain"
+                        />
+                      </DialogContent>
+                    </Dialog>
                   )}
                 </div>
               </div>
@@ -560,24 +662,38 @@ const ChatPage = () => {
         </div>
       </ScrollArea>
 
-      {/* File Preview */}
+      {/* File Preview with Thumbnails */}
       {selectedFiles.length > 0 && (
         <div className="bg-white border-t border-gray-200 p-2 md:p-3">
           <div className="max-w-4xl mx-auto">
-            <div className="flex flex-wrap gap-2">
-              {selectedFiles.map((file, index) => (
-                <div key={index} className="flex items-center bg-gray-100 rounded-lg p-2 text-xs md:text-sm">
-                  <span className="truncate max-w-24 md:max-w-32">{file.name}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeFile(index)}
-                    className="ml-2 p-1 h-auto"
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {selectedFiles.map((file, index) => {
+                const key = `${file.name}-${file.size}-${file.lastModified}`;
+                const previewUrl = filePreviewUrls[key];
+                
+                return (
+                  <div key={index} className="relative group">
+                    <div className="relative">
+                      <img 
+                        src={previewUrl} 
+                        alt={file.name}
+                        className="w-full h-20 object-cover rounded-lg border"
+                      />
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => removeFile(index)}
+                        className="absolute -top-2 -right-2 p-1 h-6 w-6 rounded-full"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1 truncate" title={file.name}>
+                      {file.name}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
