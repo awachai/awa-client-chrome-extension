@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bot, Send, Wifi, WifiOff, RotateCcw, User, Bug, Paperclip, X, Upload, Eye } from 'lucide-react';
+import { Bot, Send, Wifi, WifiOff, RotateCcw, User, Bug, Paperclip, X, Upload, Eye, FileText, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -628,47 +628,94 @@ const ChatPage = () => {
                   {/* Display message attachments */}
                   {message.attachments && message.attachments.length > 0 && (
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
-                      {message.attachments.map((attachment, index) => (
-                        <div key={index}>
-                          {attachment.type === 'image' && attachment.url ? (
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <div className="relative cursor-pointer group">
+                      {message.attachments.map((attachment, index) => {
+                        // Create data URL from base64 content if available
+                        const displayUrl = attachment.url || 
+                          (attachment.content ? `data:${attachment.fileType || 'image/jpeg'};base64,${attachment.content}` : '');
+                        
+                        return (
+                          <div key={index}>
+                            {attachment.type === 'image' ? (
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <div className="relative cursor-pointer group">
+                                    <img 
+                                      src={displayUrl} 
+                                      alt={attachment.name}
+                                      className="w-full h-20 object-cover rounded-lg border group-hover:opacity-80 transition-opacity"
+                                      onError={(e) => {
+                                        console.error('Image load error:', attachment);
+                                        // Fallback to file icon if image fails to load
+                                        const target = e.target as HTMLImageElement;
+                                        target.style.display = 'none';
+                                        const parent = target.parentElement;
+                                        if (parent) {
+                                          parent.innerHTML = `
+                                            <div class="w-full h-20 bg-gray-100 border rounded-lg flex items-center justify-center">
+                                              <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                              </svg>
+                                            </div>
+                                          `;
+                                        }
+                                      }}
+                                    />
+                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity rounded-lg flex items-center justify-center">
+                                      <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                  </div>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-4xl max-h-[80vh] p-0">
                                   <img 
-                                    src={attachment.url} 
+                                    src={displayUrl} 
                                     alt={attachment.name}
-                                    className="w-full h-20 object-cover rounded-lg border group-hover:opacity-80 transition-opacity"
+                                    className="w-full h-auto max-h-[75vh] object-contain"
                                   />
-                                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity rounded-lg flex items-center justify-center">
-                                    <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </DialogContent>
+                              </Dialog>
+                            ) : (
+                              <div 
+                                className="p-3 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+                                onClick={() => {
+                                  // Create downloadable link for non-image files
+                                  if (attachment.content) {
+                                    const blob = new Blob([atob(attachment.content)], { 
+                                      type: attachment.fileType || 'application/octet-stream' 
+                                    });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = attachment.name;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center space-x-2">
+                                  {attachment.fileType?.includes('pdf') ? (
+                                    <FileText className="h-4 w-4 text-red-600" />
+                                  ) : attachment.fileType?.includes('word') ? (
+                                    <FileText className="h-4 w-4 text-blue-600" />
+                                  ) : (
+                                    <Paperclip className="h-4 w-4 text-gray-600" />
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-900 truncate" title={attachment.name}>
+                                      {attachment.name}
+                                    </p>
+                                    <p className="text-xs text-gray-500 flex items-center">
+                                      {attachment.fileType || 'ไฟล์เอกสาร'}
+                                      <Download className="h-3 w-3 ml-1" />
+                                    </p>
                                   </div>
                                 </div>
-                              </DialogTrigger>
-                              <DialogContent className="max-w-4xl max-h-[80vh] p-0">
-                                <img 
-                                  src={attachment.url} 
-                                  alt={attachment.name}
-                                  className="w-full h-auto max-h-[75vh] object-contain"
-                                />
-                              </DialogContent>
-                            </Dialog>
-                          ) : (
-                            <div className="p-3 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-                              <div className="flex items-center space-x-2">
-                                <Paperclip className="h-4 w-4 text-gray-600" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-gray-900 truncate" title={attachment.name}>
-                                    {attachment.name}
-                                  </p>
-                                  <p className="text-xs text-gray-500">
-                                    {attachment.fileType || 'ไฟล์เอกสาร'}
-                                  </p>
-                                </div>
                               </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                   
