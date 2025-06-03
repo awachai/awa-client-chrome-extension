@@ -1,9 +1,10 @@
 
+
 PROJECT NOTES - AI WEB AGENT DEVELOPMENT
 ========================================
 
-วันที่: 2025-06-02
-เวลา: การสร้างไฟล์บันทึกโปรเจ็ค
+วันที่: 2025-06-03
+เวลา: การอัปเดตไฟล์บันทึกโปรเจ็ค
 
 สรุปความเข้าใจโปรเจ็ค:
 -------------------------
@@ -40,6 +41,7 @@ PROJECT NOTES - AI WEB AGENT DEVELOPMENT
 ปัญหาปัจจุบัน:
 --------------
 - **[FIXED]** JSON command ที่ส่งไปไม่ทำงาน - ได้เพิ่มการจัดการ JSON command structure แล้ว
+- **[FIXED]** Console logs เยอะเกินไป - ได้ทำความสะอาด logs แล้ว เหลือเฉพาะที่จำเป็น
 
 สถานะการพัฒนา:
 --------------
@@ -48,24 +50,40 @@ PROJECT NOTES - AI WEB AGENT DEVELOPMENT
 - มี command handler structure
 - **[NEW]** เพิ่มระบบรับ-ส่ง JSON command ที่สมบูรณ์
 - **[NEW]** รองรับการส่ง response กลับ server ในรูปแบบ tranType: "response"
+- **[UPDATED]** ปรับปรุงระบบ logging ให้ส่งไปยัง content script แทน console.log โดยตรง
+- **[UPDATED]** ลดการ log ที่ไม่จำเป็นออก เหลือเฉพาะข้อมูลสำคัญ
 
 คำแนะนำการใช้งาน:
 -----------------
 - เปิด debug mode เพื่อดูสถานะการเชื่อมต่อ
 - ตรวจสอบ WebSocket messages ใน debug panel
-- ตรวจสอบ console logs สำหรับ debugging
+- ตรวจสอบ console logs สำหรับ debugging (logs จะแสดงใน tab ที่มี content script)
 - **[NEW]** ส่ง JSON command ในรูปแบบ {"tranType":"request","type":"command","action":"click","selector":"..."}
 
 การอัปเดตล่าสุด:
 ---------------
-วันที่: 2025-06-02
-เวลา: 15:35 น.
-- เพิ่มการจัดการ JSON command structure ใน ChatPage
-- ระบบจะตรวจสอบ message ที่เป็น tranType:"request" และ type:"command"
-- เมื่อได้รับคำสั่ง จะส่งไปยัง Chrome Extension เพื่อดำเนินการ
-- ส่ง response กลับ server ในรูปแบบ tranType:"response" พร้อม message:"success" หรือ error
+วันที่: 2025-06-03
+เวลา: 08:45 น.
+- ปรับปรุงระบบ logging ใน ChatPage.tsx ให้ส่งไปยัง content script
+- ลด console logs ที่ไม่จำเป็นออก เหลือเฉพาะที่จำคัญ:
+  * การตรวจจับ JSON command
+  * การส่งคำสั่งไปยัง Chrome Extension  
+  * ผลลัพธ์การประมวลผลคำสั่ง (สำเร็จ/ล้มเหลว)
+- ระบบ debug mode ยังคงแสดงข้อมูลครบถ้วนสำหรับการพัฒนา
+- ปรับปรุงการจัดการ error และ success response
+
+Technical Architecture:
+-----------------------
+- React Side Panel เป็น UI หลัก
+- WebSocket connection สำหรับการสื่อสารกับ AI server
+- Chrome Extension APIs สำหรับการควบคุม DOM
+- Content Script รันบนหน้าเว็บเป้าหมาย
+- Background Script เป็นตัวกลางประมวลผลคำสั่ง
+- JSON-based command protocol สำหรับการสั่งงาน
 
 หมายเหตุ:
 --------
 - ไฟล์นี้จะถูกอัปเดตทุกครั้งที่มีการสั่งให้จำข้อมูลใหม่
 - จะมีการบันทึกวันที่และเวลาของการอัปเดต
+- ChatPage.tsx มีขนาด 470 บรรทัด ควรพิจารณา refactor ในอนาคต
+
