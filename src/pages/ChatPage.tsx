@@ -1,7 +1,7 @@
 import React from 'react';
 import { Bot, Send, Wifi, WifiOff, RotateCcw, User, Bug, Paperclip, X, Upload, Eye, FileText, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -42,6 +42,7 @@ const ChatPage = () => {
   const [isDragOver, setIsDragOver] = React.useState(false);
   const [filePreviewUrls, setFilePreviewUrls] = React.useState<{[key: string]: string}>({});
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
   const { authData, logout } = useAuth();
   const isMobile = useIsMobile();
@@ -494,6 +495,28 @@ const ChatPage = () => {
     window.location.href = '/';
   };
 
+  // Function to auto-resize textarea
+  const adjustTextareaHeight = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      const maxHeight = window.innerHeight * 0.5; // 50% of viewport height
+      const scrollHeight = textarea.scrollHeight;
+      textarea.style.height = Math.min(scrollHeight, maxHeight) + 'px';
+    }
+  };
+
+  // Update the input change handler
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputMessage(e.target.value);
+    adjustTextareaHeight();
+  };
+
+  // Auto-adjust height when component mounts or input message changes
+  React.useEffect(() => {
+    adjustTextareaHeight();
+  }, [inputMessage]);
+
   return (
     <div 
       className="flex flex-col h-screen bg-gray-50"
@@ -817,14 +840,21 @@ const ChatPage = () => {
       {/* Input */}
       <div className="bg-white border-t border-gray-200 p-2 md:p-4">
         <div className="max-w-4xl mx-auto">
-          <div className="flex space-x-2">
-            <Input
+          <div className="flex items-end space-x-2">
+            <Textarea
+              ref={textareaRef}
               value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
+              onChange={handleInputChange}
               placeholder="พิมพ์ข้อความหรือ JSON command... หรือลากวางไฟล์ลงในหน้าต่าง"
-              onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
               disabled={!isConnected || isProcessing}
-              className="flex-1 text-sm md:text-base"
+              className="flex-1 text-sm md:text-base resize-none min-h-[2.5rem] max-h-[50vh] overflow-y-auto"
+              style={{ height: 'auto' }}
             />
             <input
               ref={fileInputRef}
