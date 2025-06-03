@@ -80,8 +80,16 @@ const ChatPage = () => {
   const validateFiles = (files: FileList | File[]) => {
     const fileArray = Array.from(files);
     return fileArray.filter(file => {
+      // รองรับไฟล์หลายประเภท
       if (file.type.startsWith('image/')) {
-        return file.size <= 10 * 1024 * 1024; // 10MB limit
+        return file.size <= 10 * 1024 * 1024; // 10MB limit for images
+      }
+      // รองรับไฟล์ประเภทอื่นๆ
+      if (file.type === 'application/pdf' || 
+          file.type.startsWith('text/') ||
+          file.type === 'application/msword' ||
+          file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        return file.size <= 50 * 1024 * 1024; // 50MB limit for documents
       }
       return false;
     });
@@ -99,7 +107,7 @@ const ChatPage = () => {
       if (validFiles.length !== files.length) {
         toast({
           title: "ไฟล์บางไฟล์ไม่สามารถแนบได้",
-          description: "รองรับเฉพาะรูปภาพที่มีขนาดไม่เกิน 10MB",
+          description: "รองรับรูปภาพ (≤10MB) และเอกสาร (≤50MB)",
           variant: "destructive",
         });
       }
@@ -108,7 +116,9 @@ const ChatPage = () => {
       const newPreviewUrls: {[key: string]: string} = {};
       validFiles.forEach(file => {
         const key = `${file.name}-${file.size}-${file.lastModified}`;
-        newPreviewUrls[key] = createFilePreviewUrl(file);
+        if (file.type.startsWith('image/')) {
+          newPreviewUrls[key] = createFilePreviewUrl(file);
+        }
       });
       
       setFilePreviewUrls(prev => ({ ...prev, ...newPreviewUrls }));
@@ -154,7 +164,7 @@ const ChatPage = () => {
       if (validFiles.length !== files.length) {
         toast({
           title: "ไฟล์บางไฟล์ไม่สามารถแนบได้",
-          description: "รองรับเฉพาะรูปภาพที่มีขนาดไม่เกิน 10MB",
+          description: "รองรับรูปภาพ (≤10MB) และเอกสาร (≤50MB)",
           variant: "destructive",
         });
       }
@@ -164,7 +174,9 @@ const ChatPage = () => {
         const newPreviewUrls: {[key: string]: string} = {};
         validFiles.forEach(file => {
           const key = `${file.name}-${file.size}-${file.lastModified}`;
-          newPreviewUrls[key] = createFilePreviewUrl(file);
+          if (file.type.startsWith('image/')) {
+            newPreviewUrls[key] = createFilePreviewUrl(file);
+          }
         });
         
         setFilePreviewUrls(prev => ({ ...prev, ...newPreviewUrls }));
@@ -403,10 +415,11 @@ const ChatPage = () => {
     const messageAttachments = selectedFiles.map(file => {
       const key = `${file.name}-${file.size}-${file.lastModified}`;
       return {
-        type: 'image' as const,
+        type: file.type.startsWith('image/') ? 'image' : 'file' as const,
         content: '',
         name: file.name,
-        url: filePreviewUrls[key] || ''
+        url: file.type.startsWith('image/') ? (filePreviewUrls[key] || '') : '',
+        fileType: file.type
       };
     });
     
@@ -428,7 +441,7 @@ const ChatPage = () => {
       try {
         const base64Content = await convertFileToBase64(file);
         attachments.push({
-          type: 'image',
+          type: file.type.startsWith('image/') ? 'image' : 'file',
           content: base64Content,
           name: file.name
         });
@@ -615,27 +628,45 @@ const ChatPage = () => {
                   {message.attachments && message.attachments.length > 0 && (
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
                       {message.attachments.map((attachment, index) => (
-                        <Dialog key={index}>
-                          <DialogTrigger asChild>
-                            <div className="relative cursor-pointer group">
-                              <img 
-                                src={attachment.url} 
-                                alt={attachment.name}
-                                className="w-full h-20 object-cover rounded-lg border group-hover:opacity-80 transition-opacity"
-                              />
-                              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity rounded-lg flex items-center justify-center">
-                                <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div key={index}>
+                          {attachment.type === 'image' && attachment.url ? (
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <div className="relative cursor-pointer group">
+                                  <img 
+                                    src={attachment.url} 
+                                    alt={attachment.name}
+                                    className="w-full h-20 object-cover rounded-lg border group-hover:opacity-80 transition-opacity"
+                                  />
+                                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity rounded-lg flex items-center justify-center">
+                                    <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </div>
+                                </div>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-4xl max-h-[80vh] p-0">
+                                <img 
+                                  src={attachment.url} 
+                                  alt={attachment.name}
+                                  className="w-full h-auto max-h-[75vh] object-contain"
+                                />
+                              </DialogContent>
+                            </Dialog>
+                          ) : (
+                            <div className="p-3 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                              <div className="flex items-center space-x-2">
+                                <Paperclip className="h-4 w-4 text-gray-600" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-900 truncate" title={attachment.name}>
+                                    {attachment.name}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    {attachment.fileType || 'ไฟล์เอกสาร'}
+                                  </p>
+                                </div>
                               </div>
                             </div>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-4xl max-h-[80vh] p-0">
-                            <img 
-                              src={attachment.url} 
-                              alt={attachment.name}
-                              className="w-full h-auto max-h-[75vh] object-contain"
-                            />
-                          </DialogContent>
-                        </Dialog>
+                          )}
+                        </div>
                       ))}
                     </div>
                   )}
@@ -678,15 +709,22 @@ const ChatPage = () => {
               {selectedFiles.map((file, index) => {
                 const key = `${file.name}-${file.size}-${file.lastModified}`;
                 const previewUrl = filePreviewUrls[key];
+                const isImage = file.type.startsWith('image/');
                 
                 return (
                   <div key={index} className="relative group">
                     <div className="relative">
-                      <img 
-                        src={previewUrl} 
-                        alt={file.name}
-                        className="w-full h-20 object-cover rounded-lg border"
-                      />
+                      {isImage && previewUrl ? (
+                        <img 
+                          src={previewUrl} 
+                          alt={file.name}
+                          className="w-full h-20 object-cover rounded-lg border"
+                        />
+                      ) : (
+                        <div className="w-full h-20 bg-gray-100 border rounded-lg flex items-center justify-center">
+                          <Paperclip className="h-6 w-6 text-gray-400" />
+                        </div>
+                      )}
                       <Button
                         variant="destructive"
                         size="sm"
@@ -698,6 +736,9 @@ const ChatPage = () => {
                     </div>
                     <p className="text-xs text-gray-600 mt-1 truncate" title={file.name}>
                       {file.name}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {file.type || 'ไฟล์เอกสาร'}
                     </p>
                   </div>
                 );
@@ -723,7 +764,7 @@ const ChatPage = () => {
               ref={fileInputRef}
               type="file"
               multiple
-              accept="image/*"
+              accept="image/*,.pdf,.doc,.docx,.txt"
               onChange={handleFileSelect}
               className="hidden"
             />
