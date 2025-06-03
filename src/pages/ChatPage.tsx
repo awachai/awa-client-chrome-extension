@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Bot, Send, Wifi, WifiOff, RotateCcw, User, Bug, Paperclip, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -157,8 +156,8 @@ const ChatPage = () => {
         sendConsoleLog(`📨 New WebSocket message: ${JSON.stringify(latestMessage)}`);
       }
       
-      // ตรวจสอบว่าเป็น JSON command structure หรือไม่
-      if (latestMessage.tranType === 'request' && latestMessage.type === 'command') {
+      // ตรวจสอบว่าเป็น JSON command structure หรือไม่ - แก้ไขให้ตรวจสอบ tranType ด้วย
+      if (latestMessage.tranType === 'request' && latestMessage.type === 'command' && latestMessage.action) {
         sendConsoleLog('🎯 DETECTED JSON COMMAND - Processing...', 'info');
         
         // แสดง debug message
@@ -166,7 +165,7 @@ const ChatPage = () => {
           const debugMessage: Message = {
             id: `debug-${Date.now()}`,
             type: 'debug',
-            content: `Received command: ${latestMessage.action} on ${latestMessage.selector}`,
+            content: `🎯 Processing command: ${latestMessage.action} on ${latestMessage.selector || 'no selector'}`,
             timestamp: new Date()
           };
           setMessages(prev => [...prev, debugMessage]);
@@ -211,7 +210,7 @@ const ChatPage = () => {
                 setMessages(prev => [...prev, debugMessage]);
               }
             } else {
-              sendConsoleLog(`✅ Command executed successfully`, 'info');
+              sendConsoleLog(`✅ Command executed successfully: ${JSON.stringify(response)}`, 'info');
               
               // ตรวจสอบ response และสร้าง message ที่เหมาะสม
               const isSuccess = response && (response.success === true || response.message === 'success');
@@ -274,8 +273,11 @@ const ChatPage = () => {
           });
         }
       } else {
-        // สำหรับคำสั่งแบบอื่นๆ ที่ไม่ใช่ command
-        if (latestMessage.tranType === 'request') {
+        // สำหรับข้อความทั่วไปที่ไม่ใช่ command
+        if (latestMessage.tranType === 'request' && latestMessage.type !== 'command') {
+          commandHandler.executeCommand(latestMessage);
+        } else if (!latestMessage.tranType) {
+          // ข้อความแบบเก่าที่ไม่มี tranType structure
           commandHandler.executeCommand(latestMessage);
         }
       }
