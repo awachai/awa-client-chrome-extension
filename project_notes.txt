@@ -63,6 +63,8 @@ PROJECT NOTES - AI WEB AGENT DEVELOPMENT
 - **[FIXED 2025-06-03]** ปัญหาการตรวจสอบ JSON command ใน ChatPage.tsx - แก้ไขแล้วและระบบทำงานปกติ
 - **[FIXED 2025-06-03]** เพิ่ม Drag and Drop file functionality - รองรับการลากวางไฟล์รูปภาพ
 - **[FIXED 2025-06-03]** เพิ่ม Image Thumbnail และ Full View - แสดง thumbnail และดูรูปเต็มได้
+- **[FIXED 2025-06-03]** ปัญหาการแสดงรูปในโหมด full view - ใช้ base64 content แทน URL
+- **[FIXED 2025-06-03]** Auto-resizing Textarea - ช่องพิมพ์ข้อความปรับขนาดตามเนื้อหาอัตโนมัติ
 
 การแก้ไขล่าสุด (2025-06-03):
 ============================
@@ -82,7 +84,7 @@ PROJECT NOTES - AI WEB AGENT DEVELOPMENT
 - แสดง visual overlay เมื่อลากไฟล์เข้ามา
 - รองรับไฟล์รูปภาพทุกประเภท (image/*) ขนาดสูงสุด 10MB
 
-### 3. Image Thumbnail และ Full View Functionality (ใหม่):
+### 3. Image Thumbnail และ Full View Functionality:
 **ฟีเจอร์ที่เพิ่ม:**
 - แสดง thumbnail รูปภาพที่แนบก่อนส่ง
 - แสดง thumbnail รูปภาพในข้อความที่ส่งแล้ว
@@ -104,40 +106,73 @@ PROJECT NOTES - AI WEB AGENT DEVELOPMENT
    - แสดงรูปเต็มขนาดใน dialog overlay
    - สามารถปิดได้ด้วยการคลิกปุ่ม X หรือคลิกนอกรูป
    - รองรับ responsive design
+   - **[FIXED]** ใช้ base64 content แทน URL สำหรับการแสดงรูป
 
 4. **State Management:**
    - เพิ่ม `selectedImage` state สำหรับควบคุม modal
-   - จัดการการเปิด/ปิด modal ผ่าน `setSelectedImage`
+   - จัดการการเปิด/ปิด modal ผ่าง `setSelectedImage`
+
+### 4. Auto-resizing Textarea (ใหม่ 2025-06-03):
+**ฟีเจอร์ที่เพิ่ม:**
+- เปลี่ยนจาก Input เป็น Textarea สำหรับการพิมพ์ข้อความ
+- ปรับขนาดความสูงอัตโนมัติตามเนื้อหา
+- จำกัดความสูงสูงสุดไม่เกิน 50% ของความสูงหน้าจอ
+- รองรับการกด Enter เพื่อส่งข้อความ (Shift+Enter สำหรับขึ้นบรรทัดใหม่)
+
+**Implementation Details:**
+1. **Textarea Configuration:**
+   - ใช้ ref เพื่อควบคุม textarea element
+   - กำหนด min-height: 2.5rem และ max-height: 50vh
+   - ใช้ resize-none เพื่อป้องกันการปรับขนาดด้วยตนเอง
+   - เพิ่ม overflow-y-auto สำหรับ scrolling เมื่อเนื้อหาเกิน
+
+2. **Auto-resize Logic:**
+   ```javascript
+   const adjustTextareaHeight = () => {
+     const textarea = textareaRef.current;
+     if (textarea) {
+       textarea.style.height = 'auto';
+       const maxHeight = window.innerHeight * 0.5; // 50% of viewport height
+       const scrollHeight = textarea.scrollHeight;
+       textarea.style.height = Math.min(scrollHeight, maxHeight) + 'px';
+     }
+   };
+   ```
+
+3. **Event Handlers:**
+   - `handleInputChange`: อัปเดต state และปรับขนาด textarea
+   - `onKeyPress`: จัดการการกด Enter สำหรับส่งข้อความ
+   - `useEffect`: ปรับขนาดเมื่อ inputMessage เปลี่ยนแปลง
+
+4. **Layout Changes:**
+   - เปลี่ยน flex layout เป็น `items-end` เพื่อจัดตำแหน่งปุ่มส่ง
+   - textarea และปุ่มส่งจะ align ที่ด้านล่าง
+
+**ผลลัพธ์:**
+- ผู้ใช้สามารถพิมพ์ข้อความยาวๆ ได้สะดวกขึ้น
+- UI ปรับขนาดอัตโนมัติตามเนื้อหา
+- ไม่เกินขอบเขตที่กำหนด (50% ของหน้าจอ)
+- รองรับทั้ง desktop และ mobile
 
 **Technical Implementation:**
 ```javascript
-// Image thumbnail component
-const ImageThumbnail = ({ imageData, onClick, className }) => (
-  <img
-    src={imageData}
-    alt="Image attachment"
-    className={`cursor-pointer object-cover rounded ${className}`}
-    onClick={() => onClick(imageData)}
-  />
-);
-
-// Full image modal
-<Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
-  <DialogContent className="max-w-4xl max-h-[90vh]">
-    <img
-      src={selectedImage}
-      alt="Full size image"
-      className="w-full h-auto max-h-[80vh] object-contain"
-    />
-  </DialogContent>
-</Dialog>
+// Auto-resizing textarea component
+<Textarea
+  ref={textareaRef}
+  value={inputMessage}
+  onChange={handleInputChange}
+  placeholder="พิมพ์ข้อความหรือ JSON command... หรือลากวางไฟล์ลงในหน้าต่าง"
+  onKeyPress={(e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  }}
+  disabled={!isConnected || isProcessing}
+  className="flex-1 text-sm md:text-base resize-none min-h-[2.5rem] max-h-[50vh] overflow-y-auto"
+  style={{ height: 'auto' }}
+/>
 ```
-
-**ผลลัพธ์:**
-- ผู้ใช้เห็น thumbnail รูปที่แนบทันที
-- สามารถดูรูปเต็มได้อย่างสะดวก
-- UI/UX ที่ดีขึ้นสำหรับการจัดการรูปภาพ
-- รองรับทั้ง desktop และ mobile
 
 ### บทเรียนสำคัญ:
 **การตรวจสอบ JSON Command ต้องทำอย่างถูกต้อง:**
@@ -157,6 +192,14 @@ const ImageThumbnail = ({ imageData, onClick, className }) => (
 - ใช้ Radix UI Dialog สำหรับ modal ที่ accessible
 - จัดการ state สำหรับ selectedImage อย่างถูกต้อง
 - ต้องพิจารณา responsive design สำหรับหน้าจอขนาดต่างๆ
+- **สำคัญ: ใช้ base64 content สำหรับการแสดงรูปใน modal แทน URL**
+
+**การเพิ่ม Auto-resizing Textarea:**
+- ใช้ ref เพื่อควบคุม DOM element โดยตรง
+- คำนวณ scrollHeight และจำกัดด้วย maxHeight
+- จัดการ keyboard events สำหรับ Enter และ Shift+Enter
+- ใช้ useEffect เพื่อปรับขนาดเมื่อ content เปลี่ยน
+- ต้องพิจารณา layout alignment เมื่อ textarea มีขนาดแตกต่างกัน
 
 ### Template การตรวจสอบ JSON Command ที่ถูกต้อง:
 ```javascript
@@ -196,7 +239,7 @@ const [selectedImage, setSelectedImage] = useState(null);
 // Thumbnail component
 const ImageThumbnail = ({ imageData, size = "w-20 h-20" }) => (
   <img
-    src={imageData}
+    src={imageData} // ใช้ base64 content โดยตรง
     alt="Image"
     className={`${size} object-cover rounded cursor-pointer`}
     onClick={() => setSelectedImage(imageData)}
@@ -207,12 +250,55 @@ const ImageThumbnail = ({ imageData, size = "w-20 h-20" }) => (
 <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
   <DialogContent className="max-w-4xl max-h-[90vh]">
     <img
-      src={selectedImage}
+      src={selectedImage} // ใช้ base64 content โดยตรง
       alt="Full size image"
       className="w-full h-auto max-h-[80vh] object-contain"
     />
   </DialogContent>
 </Dialog>
+```
+
+### Template สำหรับ Auto-resizing Textarea:
+```javascript
+// State และ ref
+const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+// Auto-resize function
+const adjustTextareaHeight = () => {
+  const textarea = textareaRef.current;
+  if (textarea) {
+    textarea.style.height = 'auto';
+    const maxHeight = window.innerHeight * 0.5; // 50% of viewport height
+    const scrollHeight = textarea.scrollHeight;
+    textarea.style.height = Math.min(scrollHeight, maxHeight) + 'px';
+  }
+};
+
+// Input change handler
+const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  setInputMessage(e.target.value);
+  adjustTextareaHeight();
+};
+
+// Auto-adjust effect
+useEffect(() => {
+  adjustTextareaHeight();
+}, [inputMessage]);
+
+// Textarea component
+<Textarea
+  ref={textareaRef}
+  value={inputMessage}
+  onChange={handleInputChange}
+  onKeyPress={(e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  }}
+  className="flex-1 resize-none min-h-[2.5rem] max-h-[50vh] overflow-y-auto"
+  style={{ height: 'auto' }}
+/>
 ```
 
 ### Template สำหรับ Drag and Drop Implementation:
@@ -268,7 +354,8 @@ const handleDrop = (e) => {
 - **[WORKING]** Mobile Responsive Design
 - **[WORKING]** ระบบแนบไฟล์รูปภาพ
 - **[WORKING]** Drag and Drop file functionality - ลากวางไฟล์ได้แล้ว
-- **[WORKING]** Image Thumbnail และ Full View - แสดง thumbnail และดูรูปเต็มได้แล้ว
+- **[WORKING]** Image Thumbnail และ Full View - แสดง thumbnail และดูรูปเต็มได้แล้ว (แก้ไข base64 display แล้ว)
+- **[WORKING]** Auto-resizing Textarea - ช่องพิมพ์ข้อความปรับขนาดอัตโนมัติตามเนื้อหา
 - **[WORKING]** Chrome Extension integration กับ DOM manipulation
 
 รายละเอียดหน้าต่างๆ ในระบบ:
@@ -297,18 +384,26 @@ const handleDrop = (e) => {
    ระบบแนบไฟล์:
    - รองรับการแนบรูปภาพ (image/*)
    - ขนาดไฟล์สูงสุด 10MB ต่อไฟล์
-   - **[NEW]** แสดง thumbnail รูปที่แนบก่อนส่ง (80x80px)
+   - **[WORKING]** แสดง thumbnail รูปที่แนบก่อนส่ง (80x80px)
    - สามารถลบไฟล์ที่เลือกได้
    - แปลงไฟล์เป็น base64 ก่อนส่ง
    - **[WORKING]** รองรับ Drag and Drop - ลากวางไฟล์ได้โดยตรง
    - **[WORKING]** แสดง visual overlay เมื่อลากไฟล์เข้ามา
 
    ระบบแสดงรูปภาพ:
-   - **[NEW]** แสดง thumbnail รูปในข้อความ (150x150px)
-   - **[NEW]** คลิกเพื่อดูรูปเต็มใน modal dialog
-   - **[NEW]** รองรับการปิด modal ด้วยการคลิกนอกรูป
-   - **[NEW]** ใช้ Radix UI Dialog สำหรับ accessibility
-   - **[NEW]** Responsive design สำหรับทุกขนาดหน้าจอ
+   - **[WORKING]** แสดง thumbnail รูปในข้อความ (150x150px)
+   - **[WORKING]** คลิกเพื่อดูรูปเต็มใน modal dialog
+   - **[WORKING]** รองรับการปิด modal ด้วยการคลิกนอกรูป
+   - **[WORKING]** ใช้ Radix UI Dialog สำหรับ accessibility
+   - **[WORKING]** Responsive design สำหรับทุกขนาดหน้าจอ
+   - **[FIXED]** ใช้ base64 content สำหรับแสดงรูปใน modal
+
+   ระบบพิมพ์ข้อความ:
+   - **[NEW]** ใช้ Textarea แทน Input สำหรับการพิมพ์ข้อความ
+   - **[NEW]** ปรับขนาดความสูงอัตโนมัติตามเนื้อหา
+   - **[NEW]** จำกัดความสูงสูงสุดไม่เกิน 50% ของหน้าจอ
+   - **[NEW]** รองรับ Enter เพื่อส่งข้อความ, Shift+Enter เพื่อขึ้นบรรทัดใหม่
+   - **[NEW]** Layout ปรับให้ปุ่มส่งอยู่ชิดด้านล่างของ textarea
 
    Debug Mode:
    - แสดงข้อมูลการเชื่อมต่อ WebSocket
@@ -324,14 +419,15 @@ const handleDrop = (e) => {
    - ปุ่มต่างๆ ปรับขนาดและซ่อนข้อความบางส่วน
    - ข้อความในแชทปรับ max-width ให้เหมาะสม
    - File preview ปรับให้แสดงได้ดีบน mobile
-   - **[NEW]** Image thumbnails และ modal ปรับให้เหมาะกับ mobile
+   - **[WORKING]** Image thumbnails และ modal ปรับให้เหมาะกับ mobile
+   - **[NEW]** Auto-resizing textarea รองรับ mobile
    - Drag and Drop รองรับบน mobile browser ที่รองรับ
 
    Message Types:
    - User messages: ข้อความจากผู้ใช้ (สีฟ้า)
    - AI messages: ข้อความจาก AI (สีขาว)
    - Debug messages: ข้อความ debug (สีเหลือง)
-   - **[NEW]** รองรับการแสดงรูปภาพในข้อความพร้อม thumbnail
+   - **[WORKING]** รองรับการแสดงรูปภาพในข้อความพร้อม thumbnail
 
    Chrome Extension Integration:
    - **[WORKING]** ส่งคำสั่ง JSON ไปยัง Background Script
@@ -371,21 +467,26 @@ Chrome Extension Components:
 - ตรวจสอบ console logs สำหรับ debugging (logs จะแสดงใน tab ที่มี content script)
 - **[WORKING]** ส่ง JSON command ในรูปแบบ {"tranType":"request","type":"command","action":"click","selector":"..."}
 - **[WORKING]** ลากวางไฟล์รูปภาพเข้าในหน้าแชทได้โดยตรง
-- **[NEW]** คลิกที่ thumbnail เพื่อดูรูปเต็มในโหมด modal
+- **[WORKING]** คลิกที่ thumbnail เพื่อดูรูปเต็มในโหมด modal
+- **[NEW]** พิมพ์ข้อความยาวๆ ได้ในช่องแชทที่ปรับขนาดอัตโนมัติ
+- **[NEW]** ใช้ Shift+Enter เพื่อขึ้นบรรทัดใหม่, Enter เพื่อส่งข้อความ
 
 การอัปเดตล่าสุด:
 ---------------
 วันที่: 2025-06-03
-เวลา: 15:45 น.
+เวลา: 16:30 น.
 - **[FINAL FIX]** แก้ไขปัญหาการตรวจสอบ JSON command structure ใน ChatPage.tsx
 - ระบบ JSON command ทำงานได้สมบูรณ์แล้ว
 - สามารถส่งคำสั่ง click, highlight, scroll_to ได้ตามปกติ
 - เพิ่มการ log เพื่อ debug และติดตามการทำงาน
 - **[COMPLETED 2025-06-03]** เพิ่ม Drag and Drop functionality สำหรับไฟล์รูปภาพ
-- **[NEW 2025-06-03]** เพิ่ม Image Thumbnail และ Full View functionality
+- **[COMPLETED 2025-06-03]** เพิ่ม Image Thumbnail และ Full View functionality
+- **[FIXED 2025-06-03]** แก้ไขปัญหาการแสดงรูปใน modal dialog ใช้ base64 content
+- **[NEW 2025-06-03]** เพิ่ม Auto-resizing Textarea สำหรับการพิมพ์ข้อความ
 - **[NEW]** รองรับการแสดง thumbnail ก่อนส่งและในข้อความ
 - **[NEW]** สามารถคลิกดูรูปเต็มใน modal dialog
-- **ระบบ AI Web Agent พร้อมใช้งานเต็มรูปแบบแล้ว รวมถึง UI/UX ที่สมบูรณ์สำหรับรูปภาพ**
+- **[NEW]** ช่องพิมพ์ข้อความปรับขนาดอัตโนมัติตามเนื้อหา ไม่เกิน 50% ของหน้าจอ
+- **ระบบ AI Web Agent พร้อมใช้งานเต็มรูปแบบแล้ว รวมถึง UI/UX ที่สมบูรณ์**
 
 Technical Architecture:
 -----------------------
@@ -396,16 +497,21 @@ Technical Architecture:
 - Background Script เป็นตัวกลางประมวลผลคำสั่ง
 - **[WORKING]** JSON-based command protocol สำหรับการสั่งงาน
 - **[WORKING]** File handling system with drag and drop support
-- **[NEW]** Image display system with thumbnail และ full view modal
-- **[NEW]** Radix UI Dialog integration สำหรับ accessibility
+- **[WORKING]** Image display system with thumbnail และ full view modal
+- **[WORKING]** Radix UI Dialog integration สำหรับ accessibility
+- **[NEW]** Auto-resizing textarea system สำหรับ responsive input
 
 หมายเหตุ:
 --------
 - ไฟล์นี้จะถูกอัปเดตทุกครั้งที่มีการสั่งให้จำข้อมูลใหม่
 - จะมีการบันทึกวันที่และเวลาของการอัปเดต
-- ChatPage.tsx มีขนาด 650+ บรรทัด **ควรพิจารณา refactor เร่งด่วน**
+- ChatPage.tsx มีขนาด 860+ บรรทัด **ควรพิจารณา refactor เร่งด่วน**
 - **สำคัญ: การตรวจสอบ JSON command ใน useEffect ต้องทำอย่างถูกต้องตาม template ข้างต้น**
 - **สำคัญ: การเพิ่ม drag and drop ต้องใช้ dragCounter เพื่อจัดการ nested events**
 - **สำคัญ: การแสดงรูปภาพต้องใช้ object-cover สำหรับ thumbnail และ Radix UI Dialog สำหรับ modal**
-- **ระบบพร้อมใช้งานครบถ้วนแล้ว รวมถึงฟีเจอร์ image thumbnail และ full view**
-- **ChatPage.tsx ขนาดใหญ่เกินไป ต้อง refactor เป็นไฟล์เล็กๆ หลายไฟล์**
+- **สำคัญ: ใช้ base64 content สำหรับการแสดงรูปใน modal แทนการใช้ URL**
+- **สำคัญ: Auto-resizing textarea ต้องใช้ ref และคำนวณ scrollHeight กับ maxHeight อย่างถูกต้อง**
+- **ระบบพร้อมใช้งานครบถ้วนแล้ว รวมถึงฟีเจอร์ auto-resizing textarea**
+- **ChatPage.tsx ขนาดใหญ่มากเกินไป (860+ บรรทัด) ต้อง refactor เป็นไฟล์เล็กๆ หลายไฟล์ทันที**
+
+**สรุป: ระบบ AI Web Agent ทำงานได้สมบูรณ์แบบ พร้อมใช้งานจริง มี UI/UX ที่ดี รองรับทั้ง desktop และ mobile**
