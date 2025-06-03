@@ -62,83 +62,82 @@ PROJECT NOTES - AI WEB AGENT DEVELOPMENT
 - **[FIXED]** Mobile responsive และ file attachment - ได้เพิ่มกลับมาแล้ว
 - **[FIXED 2025-06-03]** ปัญหาการตรวจสอบ JSON command ใน ChatPage.tsx - แก้ไขแล้วและระบบทำงานปกติ
 - **[FIXED 2025-06-03]** เพิ่ม Drag and Drop file functionality - รองรับการลากวางไฟล์รูปภาพ
+- **[FIXED 2025-06-03]** เพิ่ม Image Thumbnail และ Full View - แสดง thumbnail และดูรูปเต็มได้
 
 การแก้ไขล่าสุด (2025-06-03):
 ============================
 
-### ปัญหาที่พบเมื่อก่อน:
+### 1. JSON Command System (เก่า):
+**ปัญหาที่พบเมื่อก่อน:**
 - ส่ง command มาแล้วระบบไม่ทำงาน
 - การตรวจสอบ JSON command structure ใน ChatPage.tsx ไม่ถูกต้อง
 
-### สาเหตุหลัก (เก่า):
-- ใน ChatPage.tsx useEffect ที่ handle WebSocket messages มีการตรวจสอบ `message.tranType`, `message.type`, และ `message.action` ไม่ครบถ้วน
-- เงื่อนไขการตรวจสอบไม่ตรงกับ JSON command format ที่ส่งมาจาก server
+**การแก้ไข (เก่า):**
+- ปรับปรุงการตรวจสอบ JSON command ใน ChatPage.tsx
+- เพิ่มการ log เพื่อ debug และติดตามการทำงาง
 
-### การแก้ไข (เก่า):
-1. **ปรับปรุงการตรวจสอบ JSON command ใน ChatPage.tsx:**
-   ```javascript
-   // แก้ไขจาก
-   if (message.tranType === 'request' && message.type && message.action) {
-   
-   // เป็น
-   if (message.tranType === 'request' && message.type === 'command' && message.action) {
-   ```
-
-2. **เพิ่มการ log เพื่อ debug:**
-   - เพิ่ม console.log เพื่อติดตาม message ที่เข้ามา
-   - เพิ่มการตรวจสอบ field แต่ละตัวอย่างละเอียด
-
-### การอัปเดตใหม่ล่าสุด - Drag and Drop Functionality (2025-06-03):
-========================================================================
-
+### 2. Drag and Drop File Functionality:
 **ฟีเจอร์ที่เพิ่ม:**
 - รองรับการลากวางไฟล์รูปภาพ (Drag and Drop) ใน ChatPage
 - แสดง visual overlay เมื่อลากไฟล์เข้ามา
 - รองรับไฟล์รูปภาพทุกประเภท (image/*) ขนาดสูงสุด 10MB
 
+### 3. Image Thumbnail และ Full View Functionality (ใหม่):
+**ฟีเจอร์ที่เพิ่ม:**
+- แสดง thumbnail รูปภาพที่แนบก่อนส่ง
+- แสดง thumbnail รูปภาพในข้อความที่ส่งแล้ว
+- สามารถคลิกดูรูปแบบเต็มใน modal dialog
+- รองรับทั้ง desktop และ mobile
+
 **Implementation Details:**
-1. **Event Handlers ที่เพิ่ม:**
-   - `handleDragEnter`: จัดการเมื่อเริ่มลากไฟล์เข้ามา
-   - `handleDragOver`: ป้องกัน default behavior และแสดง visual feedback
-   - `handleDragLeave`: จัดการเมื่อลากไฟล์ออกจากพื้นที่
-   - `handleDrop`: ประมวลผลไฟล์ที่ถูกวาง
+1. **Image Preview ก่อนส่ง:**
+   - แสดง thumbnail ขนาด 80x80px พร้อม rounded corners
+   - มีปุ่ม X สำหรับลบไฟล์
+   - ใช้ object-cover เพื่อรักษาสัดส่วนรูป
 
-2. **State Management:**
-   - เพิ่ม `isDragOver` state เพื่อควบคุม visual overlay
-   - ใช้ `dragCounter` เพื่อจัดการ dragenter/dragleave events อย่างถูกต้อง
+2. **Image Display ในข้อความ:**
+   - แสดง thumbnail ขนาด 150x150px ใน message
+   - คลิกเพื่อดูรูปเต็มใน modal
+   - ใช้ Radix UI Dialog component
 
-3. **Validation:**
-   - ตรวจสอบประเภทไฟล์ (เฉพาะรูปภาพ)
-   - ตรวจสอบขนาดไฟล์ (สูงสุด 10MB)
-   - แสดงข้อความแจ้งเตือนหากไฟล์ไม่ถูกต้อง
+3. **Full View Modal:**
+   - แสดงรูปเต็มขนาดใน dialog overlay
+   - สามารถปิดได้ด้วยการคลิกปุ่ม X หรือคลิกนอกรูป
+   - รองรับ responsive design
 
-4. **UI/UX Improvements:**
-   - แสดง overlay สีฟ้าพร้อมข้อความแนะนำเมื่อลากไฟล์
-   - รองรับทั้งการเลือกไฟล์แบบปกติและ drag & drop
-   - ป้องกันการเปิดไฟล์ใน browser เมื่อ drop นอกพื้นที่
+4. **State Management:**
+   - เพิ่ม `selectedImage` state สำหรับควบคุม modal
+   - จัดการการเปิด/ปิด modal ผ่าน `setSelectedImage`
 
 **Technical Implementation:**
 ```javascript
-// Event handler สำหรับ drag and drop
-const handleDrop = (e) => {
-  e.preventDefault();
-  setIsDragOver(false);
-  setDragCounter(0);
-  
-  const files = Array.from(e.dataTransfer.files);
-  const imageFiles = files.filter(file => file.type.startsWith('image/'));
-  
-  if (imageFiles.length > 0) {
-    handleFileSelect({ target: { files: imageFiles } });
-  }
-};
+// Image thumbnail component
+const ImageThumbnail = ({ imageData, onClick, className }) => (
+  <img
+    src={imageData}
+    alt="Image attachment"
+    className={`cursor-pointer object-cover rounded ${className}`}
+    onClick={() => onClick(imageData)}
+  />
+);
+
+// Full image modal
+<Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
+  <DialogContent className="max-w-4xl max-h-[90vh]">
+    <img
+      src={selectedImage}
+      alt="Full size image"
+      className="w-full h-auto max-h-[80vh] object-contain"
+    />
+  </DialogContent>
+</Dialog>
 ```
 
 **ผลลัพธ์:**
-- ผู้ใช้สามารถลากวางไฟล์รูปภาพได้โดยตรง
-- มี visual feedback ที่ชัดเจน
-- ระบบ validation ทำงานได้ถูกต้อง
-- รองรับทั้ง desktop และ mobile (ในบราวเซอร์ที่รองรับ)
+- ผู้ใช้เห็น thumbnail รูปที่แนบทันที
+- สามารถดูรูปเต็มได้อย่างสะดวก
+- UI/UX ที่ดีขึ้นสำหรับการจัดการรูปภาพ
+- รองรับทั้ง desktop และ mobile
 
 ### บทเรียนสำคัญ:
 **การตรวจสอบ JSON Command ต้องทำอย่างถูกต้อง:**
@@ -152,6 +151,12 @@ const handleDrop = (e) => {
 - ใช้ dragCounter เพื่อติดตาม nested drag events
 - ต้อง preventDefault() ใน dragover และ drop events
 - ควรมี visual feedback ที่ชัดเจนสำหรับผู้ใช้
+
+**การเพิ่ม Image Thumbnail และ Full View:**
+- ใช้ object-cover สำหรับ thumbnail เพื่อรักษาสัดส่วน
+- ใช้ Radix UI Dialog สำหรับ modal ที่ accessible
+- จัดการ state สำหรับ selectedImage อย่างถูกต้อง
+- ต้องพิจารณา responsive design สำหรับหน้าจอขนาดต่างๆ
 
 ### Template การตรวจสอบ JSON Command ที่ถูกต้อง:
 ```javascript
@@ -181,6 +186,33 @@ useEffect(() => {
     console.error('Failed to parse WebSocket message:', error);
   }
 }, [wsMessage]);
+```
+
+### Template สำหรับ Image Thumbnail และ Full View:
+```javascript
+// State สำหรับ modal
+const [selectedImage, setSelectedImage] = useState(null);
+
+// Thumbnail component
+const ImageThumbnail = ({ imageData, size = "w-20 h-20" }) => (
+  <img
+    src={imageData}
+    alt="Image"
+    className={`${size} object-cover rounded cursor-pointer`}
+    onClick={() => setSelectedImage(imageData)}
+  />
+);
+
+// Full view modal
+<Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
+  <DialogContent className="max-w-4xl max-h-[90vh]">
+    <img
+      src={selectedImage}
+      alt="Full size image"
+      className="w-full h-auto max-h-[80vh] object-contain"
+    />
+  </DialogContent>
+</Dialog>
 ```
 
 ### Template สำหรับ Drag and Drop Implementation:
@@ -236,6 +268,7 @@ const handleDrop = (e) => {
 - **[WORKING]** Mobile Responsive Design
 - **[WORKING]** ระบบแนบไฟล์รูปภาพ
 - **[WORKING]** Drag and Drop file functionality - ลากวางไฟล์ได้แล้ว
+- **[WORKING]** Image Thumbnail และ Full View - แสดง thumbnail และดูรูปเต็มได้แล้ว
 - **[WORKING]** Chrome Extension integration กับ DOM manipulation
 
 รายละเอียดหน้าต่างๆ ในระบบ:
@@ -264,11 +297,18 @@ const handleDrop = (e) => {
    ระบบแนบไฟล์:
    - รองรับการแนบรูปภาพ (image/*)
    - ขนาดไฟล์สูงสุด 10MB ต่อไฟล์
-   - แสดง preview ไฟล์ที่เลือก
+   - **[NEW]** แสดง thumbnail รูปที่แนบก่อนส่ง (80x80px)
    - สามารถลบไฟล์ที่เลือกได้
    - แปลงไฟล์เป็น base64 ก่อนส่ง
-   - **[NEW]** รองรับ Drag and Drop - ลากวางไฟล์ได้โดยตรง
-   - **[NEW]** แสดง visual overlay เมื่อลากไฟล์เข้ามา
+   - **[WORKING]** รองรับ Drag and Drop - ลากวางไฟล์ได้โดยตรง
+   - **[WORKING]** แสดง visual overlay เมื่อลากไฟล์เข้ามา
+
+   ระบบแสดงรูปภาพ:
+   - **[NEW]** แสดง thumbnail รูปในข้อความ (150x150px)
+   - **[NEW]** คลิกเพื่อดูรูปเต็มใน modal dialog
+   - **[NEW]** รองรับการปิด modal ด้วยการคลิกนอกรูป
+   - **[NEW]** ใช้ Radix UI Dialog สำหรับ accessibility
+   - **[NEW]** Responsive design สำหรับทุกขนาดหน้าจอ
 
    Debug Mode:
    - แสดงข้อมูลการเชื่อมต่อ WebSocket
@@ -284,13 +324,14 @@ const handleDrop = (e) => {
    - ปุ่มต่างๆ ปรับขนาดและซ่อนข้อความบางส่วน
    - ข้อความในแชทปรับ max-width ให้เหมาะสม
    - File preview ปรับให้แสดงได้ดีบน mobile
+   - **[NEW]** Image thumbnails และ modal ปรับให้เหมาะกับ mobile
    - Drag and Drop รองรับบน mobile browser ที่รองรับ
 
    Message Types:
    - User messages: ข้อความจากผู้ใช้ (สีฟ้า)
    - AI messages: ข้อความจาก AI (สีขาว)
    - Debug messages: ข้อความ debug (สีเหลือง)
-   - รองรับการแสดงรูปภาพในข้อความ
+   - **[NEW]** รองรับการแสดงรูปภาพในข้อความพร้อม thumbnail
 
    Chrome Extension Integration:
    - **[WORKING]** ส่งคำสั่ง JSON ไปยัง Background Script
@@ -329,18 +370,22 @@ Chrome Extension Components:
 - ตรวจสอบ WebSocket messages ใน debug panel
 - ตรวจสอบ console logs สำหรับ debugging (logs จะแสดงใน tab ที่มี content script)
 - **[WORKING]** ส่ง JSON command ในรูปแบบ {"tranType":"request","type":"command","action":"click","selector":"..."}
-- **[NEW]** ลากวางไฟล์รูปภาพเข้าในหน้าแชทได้โดยตรง
+- **[WORKING]** ลากวางไฟล์รูปภาพเข้าในหน้าแชทได้โดยตรง
+- **[NEW]** คลิกที่ thumbnail เพื่อดูรูปเต็มในโหมด modal
 
 การอัปเดตล่าสุด:
 ---------------
 วันที่: 2025-06-03
-เวลา: 14:30 น.
+เวลา: 15:45 น.
 - **[FINAL FIX]** แก้ไขปัญหาการตรวจสอบ JSON command structure ใน ChatPage.tsx
 - ระบบ JSON command ทำงานได้สมบูรณ์แล้ว
 - สามารถส่งคำสั่ง click, highlight, scroll_to ได้ตามปกติ
 - เพิ่มการ log เพื่อ debug และติดตามการทำงาน
-- **[NEW 2025-06-03]** เพิ่ม Drag and Drop functionality สำหรับไฟล์รูปภาพ
-- **ระบบ AI Web Agent พร้อมใช้งานเต็มรูปแบบแล้ว รวมถึงการลากวางไฟล์**
+- **[COMPLETED 2025-06-03]** เพิ่ม Drag and Drop functionality สำหรับไฟล์รูปภาพ
+- **[NEW 2025-06-03]** เพิ่ม Image Thumbnail และ Full View functionality
+- **[NEW]** รองรับการแสดง thumbnail ก่อนส่งและในข้อความ
+- **[NEW]** สามารถคลิกดูรูปเต็มใน modal dialog
+- **ระบบ AI Web Agent พร้อมใช้งานเต็มรูปแบบแล้ว รวมถึง UI/UX ที่สมบูรณ์สำหรับรูปภาพ**
 
 Technical Architecture:
 -----------------------
@@ -351,12 +396,16 @@ Technical Architecture:
 - Background Script เป็นตัวกลางประมวลผลคำสั่ง
 - **[WORKING]** JSON-based command protocol สำหรับการสั่งงาน
 - **[WORKING]** File handling system with drag and drop support
+- **[NEW]** Image display system with thumbnail และ full view modal
+- **[NEW]** Radix UI Dialog integration สำหรับ accessibility
 
 หมายเหตุ:
 --------
 - ไฟล์นี้จะถูกอัปเดตทุกครั้งที่มีการสั่งให้จำข้อมูลใหม่
 - จะมีการบันทึกวันที่และเวลาของการอัปเดต
-- ChatPage.tsx มีขนาด 559 บรรทัด ควรพิจารณา refactor ในอนาคต
+- ChatPage.tsx มีขนาด 650+ บรรทัด **ควรพิจารณา refactor เร่งด่วน**
 - **สำคัญ: การตรวจสอบ JSON command ใน useEffect ต้องทำอย่างถูกต้องตาม template ข้างต้น**
 - **สำคัญ: การเพิ่ม drag and drop ต้องใช้ dragCounter เพื่อจัดการ nested events**
-- **ระบบพร้อมใช้งานครบถ้วนแล้ว รวมถึงฟีเจอร์ drag and drop ไฟล์**
+- **สำคัญ: การแสดงรูปภาพต้องใช้ object-cover สำหรับ thumbnail และ Radix UI Dialog สำหรับ modal**
+- **ระบบพร้อมใช้งานครบถ้วนแล้ว รวมถึงฟีเจอร์ image thumbnail และ full view**
+- **ChatPage.tsx ขนาดใหญ่เกินไป ต้อง refactor เป็นไฟล์เล็กๆ หลายไฟล์**
