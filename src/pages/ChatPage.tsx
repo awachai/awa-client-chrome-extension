@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Bot, Send, Wifi, WifiOff, RotateCcw, User, Bug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,23 @@ const ChatPage = () => {
   const [debugMode, setDebugMode] = React.useState(false);
   const { toast } = useToast();
   const { authData, logout } = useAuth();
+
+  // Helper function to send console logs to content script
+  const sendConsoleLog = (message: string, level: 'log' | 'info' | 'warn' | 'error' = 'log') => {
+    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.tabs) {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+          chrome.tabs.sendMessage(tabs[0].id!, {
+            type: 'CONSOLE_LOG',
+            message: message,
+            level: level
+          });
+        }
+      });
+    }
+    // Also log to current console as fallback
+    console[level](message);
+  };
 
   const parseJsonFromText = (text: string) => {
     try {
@@ -89,33 +107,33 @@ const ChatPage = () => {
   });
 
   React.useEffect(() => {
-    console.log('🔍 === WEBSOCKET MESSAGES DEBUG START ===');
-    console.log('📊 Total WebSocket messages:', wsMessages.length);
-    console.log('📝 All WebSocket messages:', wsMessages);
+    sendConsoleLog('🔍 === WEBSOCKET MESSAGES DEBUG START ===');
+    sendConsoleLog(`📊 Total WebSocket messages: ${wsMessages.length}`);
+    sendConsoleLog(`📝 All WebSocket messages: ${JSON.stringify(wsMessages)}`);
     
     if (wsMessages.length > 0) {
       const latestMessage = wsMessages[wsMessages.length - 1];
-      console.log('🎯 === PROCESSING LATEST MESSAGE ===');
-      console.log('📨 Latest message:', latestMessage);
-      console.log('🔢 Message type:', typeof latestMessage);
-      console.log('⚡ tranType:', latestMessage.tranType);
-      console.log('📋 type:', latestMessage.type);
-      console.log('🎬 action:', latestMessage.action);
+      sendConsoleLog('🎯 === PROCESSING LATEST MESSAGE ===');
+      sendConsoleLog(`📨 Latest message: ${JSON.stringify(latestMessage)}`);
+      sendConsoleLog(`🔢 Message type: ${typeof latestMessage}`);
+      sendConsoleLog(`⚡ tranType: ${latestMessage.tranType}`);
+      sendConsoleLog(`📋 type: ${latestMessage.type}`);
+      sendConsoleLog(`🎬 action: ${latestMessage.action}`);
       
       // เพิ่ม console.log เพื่อ debug เงื่อนไข
-      console.log('🧪 === CONDITION CHECKS ===');
-      console.log('✅ Is tranType === "request"?', latestMessage.tranType === 'request');
-      console.log('✅ Is type === "command"?', latestMessage.type === 'command');
-      console.log('✅ Both conditions met?', latestMessage.tranType === 'request' && latestMessage.type === 'command');
+      sendConsoleLog('🧪 === CONDITION CHECKS ===');
+      sendConsoleLog(`✅ Is tranType === "request"? ${latestMessage.tranType === 'request'}`);
+      sendConsoleLog(`✅ Is type === "command"? ${latestMessage.type === 'command'}`);
+      sendConsoleLog(`✅ Both conditions met? ${latestMessage.tranType === 'request' && latestMessage.type === 'command'}`);
       
       // ตรวจสอบว่าเป็น JSON command structure หรือไม่
       if (latestMessage.tranType === 'request' && latestMessage.type === 'command') {
-        console.log('🎯 DETECTED JSON COMMAND - Processing...');
-        console.log('🔧 Command details:', {
+        sendConsoleLog('🎯 DETECTED JSON COMMAND - Processing...');
+        sendConsoleLog(`🔧 Command details: ${JSON.stringify({
           action: latestMessage.action,
           selector: latestMessage.selector,
           message: latestMessage.message
-        });
+        })}`);
         
         // แสดง debug message
         if (debugMode) {
@@ -129,16 +147,16 @@ const ChatPage = () => {
         }
         
         // ตรวจสอบว่ามี Chrome Extension หรือไม่
-        console.log('🔍 CHECKING CHROME EXTENSION...');
-        console.log('🌐 Chrome object:', typeof chrome);
-        console.log('⚡ Chrome runtime:', typeof chrome?.runtime);
-        console.log('🆔 Chrome runtime ID:', chrome?.runtime?.id);
+        sendConsoleLog('🔍 CHECKING CHROME EXTENSION...');
+        sendConsoleLog(`🌐 Chrome object: ${typeof chrome}`);
+        sendConsoleLog(`⚡ Chrome runtime: ${typeof chrome?.runtime}`);
+        sendConsoleLog(`🆔 Chrome runtime ID: ${chrome?.runtime?.id}`);
         
         // ส่งคำสั่งไปยัง Chrome Extension
         if (typeof chrome !== 'undefined' && chrome.runtime) {
-          console.log('📤 SENDING TO CHROME EXTENSION...');
-          console.log('🏷️ Tab ID:', tabId);
-          console.log('🏠 Room:', room);
+          sendConsoleLog('📤 SENDING TO CHROME EXTENSION...');
+          sendConsoleLog(`🏷️ Tab ID: ${tabId}`);
+          sendConsoleLog(`🏠 Room: ${room}`);
           
           const commandPayload = {
             type: 'EXECUTE_DOM_COMMAND',
@@ -147,13 +165,13 @@ const ChatPage = () => {
             originalCommand: latestMessage
           };
           
-          console.log('📦 Command payload:', commandPayload);
+          sendConsoleLog(`📦 Command payload: ${JSON.stringify(commandPayload)}`);
           
           chrome.runtime.sendMessage(commandPayload, (response) => {
-            console.log('📥 CHROME EXTENSION RESPONSE:', response);
+            sendConsoleLog(`📥 CHROME EXTENSION RESPONSE: ${JSON.stringify(response)}`);
             
             if (chrome.runtime.lastError) {
-              console.error('❌ Chrome extension error:', chrome.runtime.lastError);
+              sendConsoleLog(`❌ Chrome extension error: ${chrome.runtime.lastError.message}`, 'error');
               
               // ส่ง error response กลับ
               const errorResponse = {
@@ -167,7 +185,7 @@ const ChatPage = () => {
                 timestamp: new Date().toISOString()
               };
               
-              console.log('📤 SENDING ERROR RESPONSE:', errorResponse);
+              sendConsoleLog(`📤 SENDING ERROR RESPONSE: ${JSON.stringify(errorResponse)}`);
               sendMessage(errorResponse);
               
               if (debugMode) {
@@ -180,7 +198,7 @@ const ChatPage = () => {
                 setMessages(prev => [...prev, debugMessage]);
               }
             } else {
-              console.log('✅ Command executed successfully:', response);
+              sendConsoleLog(`✅ Command executed successfully: ${JSON.stringify(response)}`);
               
               // ตรวจสอบ response และสร้าง message ที่เหมาะสม
               const isSuccess = response && (response.success === true || response.message === 'success');
@@ -198,7 +216,7 @@ const ChatPage = () => {
                 timestamp: new Date().toISOString()
               };
               
-              console.log('📤 SENDING SUCCESS RESPONSE:', successResponse);
+              sendConsoleLog(`📤 SENDING SUCCESS RESPONSE: ${JSON.stringify(successResponse)}`);
               sendMessage(successResponse);
               
               if (debugMode) {
@@ -213,11 +231,11 @@ const ChatPage = () => {
             }
           });
         } else {
-          console.warn('⚠️ Chrome extension not available, using fallback command handler');
+          sendConsoleLog('⚠️ Chrome extension not available, using fallback command handler', 'warn');
           
           // Fallback ไปใช้ CommandHandler แบบเดิม
           commandHandler.executeCommand(latestMessage).then(result => {
-            console.log('📥 FALLBACK COMMAND RESULT:', result);
+            sendConsoleLog(`📥 FALLBACK COMMAND RESULT: ${JSON.stringify(result)}`);
             
             if (result) {
               const response = {
@@ -231,7 +249,7 @@ const ChatPage = () => {
                 timestamp: new Date().toISOString()
               };
               
-              console.log('📤 SENDING FALLBACK RESPONSE:', response);
+              sendConsoleLog(`📤 SENDING FALLBACK RESPONSE: ${JSON.stringify(response)}`);
               sendMessage(response);
               
               if (debugMode) {
@@ -247,24 +265,24 @@ const ChatPage = () => {
           });
         }
       } else {
-        console.log('❓ Not a command message, processing as regular message');
-        console.log('🔍 Message details:', {
+        sendConsoleLog('❓ Not a command message, processing as regular message');
+        sendConsoleLog(`🔍 Message details: ${JSON.stringify({
           tranType: latestMessage.tranType,
           type: latestMessage.type,
           action: latestMessage.action
-        });
+        })}`);
         
         // สำหรับคำสั่งแบบอื่นๆ ที่ไม่ใช่ command
         if (latestMessage.tranType === 'request') {
-          console.log('🔄 Processing non-command request:', latestMessage);
+          sendConsoleLog(`🔄 Processing non-command request: ${JSON.stringify(latestMessage)}`);
           commandHandler.executeCommand(latestMessage);
         }
       }
     } else {
-      console.log('ℹ️ No WebSocket messages yet');
+      sendConsoleLog('ℹ️ No WebSocket messages yet');
     }
     
-    console.log('🔚 === WEBSOCKET MESSAGES DEBUG END ===');
+    sendConsoleLog('🔚 === WEBSOCKET MESSAGES DEBUG END ===');
   }, [wsMessages, debugMode, tabId, room, sendMessage]);
 
   const handleSendMessage = async () => {
@@ -306,7 +324,7 @@ const ChatPage = () => {
     const sent = sendMessage(wsMessage);
     
     if (sent) {
-      console.log('Message sent successfully via WebSocket');
+      sendConsoleLog('Message sent successfully via WebSocket');
     } else {
       toast({
         title: "ส่งข้อความไม่สำเร็จ",
