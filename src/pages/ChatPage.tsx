@@ -412,32 +412,8 @@ const ChatPage = () => {
 
     setIsProcessing(true);
     
-    // Create attachments with preview URLs for the message
-    const messageAttachments = selectedFiles.map(file => {
-      const key = `${file.name}-${file.size}-${file.lastModified}`;
-      return {
-        type: file.type.startsWith('image/') ? 'image' as const : 'file' as const,
-        content: '',
-        name: file.name,
-        url: file.type.startsWith('image/') ? (filePreviewUrls[key] || '') : '',
-        fileType: file.type
-      };
-    });
-    
-    const userMessage: Message = {
-      id: `user-${Date.now()}`,
-      type: 'user',
-      content: inputMessage || (selectedFiles.length > 0 ? `แนบไฟล์ ${selectedFiles.length} ไฟล์` : ''),
-      timestamp: new Date(),
-      attachments: messageAttachments
-    };
-    
-    setMessages(prev => [...prev, userMessage]);
-    
-    const parseResult = parseJsonFromText(inputMessage);
+    // Convert files to base64 first
     const attachments: Attachment[] = [];
-    
-    // Convert files to base64
     for (const file of selectedFiles) {
       try {
         const base64Content = await convertFileToBase64(file);
@@ -450,6 +426,27 @@ const ChatPage = () => {
         console.error('Error converting file to base64:', error);
       }
     }
+    
+    // Create attachments with base64 content for the message display
+    const messageAttachments = attachments.map(attachment => ({
+      type: attachment.type,
+      content: attachment.content,
+      name: attachment.name,
+      url: attachment.type === 'image' ? `data:${selectedFiles.find(f => f.name === attachment.name)?.type || 'image/jpeg'};base64,${attachment.content}` : '',
+      fileType: selectedFiles.find(f => f.name === attachment.name)?.type
+    }));
+    
+    const userMessage: Message = {
+      id: `user-${Date.now()}`,
+      type: 'user',
+      content: inputMessage || (selectedFiles.length > 0 ? `แนบไฟล์ ${selectedFiles.length} ไฟล์` : ''),
+      timestamp: new Date(),
+      attachments: messageAttachments
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    
+    const parseResult = parseJsonFromText(inputMessage);
     
     const wsMessage = {
       type: 'user_message',
@@ -629,9 +626,11 @@ const ChatPage = () => {
                   {message.attachments && message.attachments.length > 0 && (
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
                       {message.attachments.map((attachment, index) => {
-                        // Create data URL from base64 content if available
+                        // Use attachment.url if available, otherwise create from base64 content
                         const displayUrl = attachment.url || 
                           (attachment.content ? `data:${attachment.fileType || 'image/jpeg'};base64,${attachment.content}` : '');
+                        
+                        console.log('Attachment display URL:', displayUrl.substring(0, 50) + '...');
                         
                         return (
                           <div key={index}>
@@ -644,7 +643,8 @@ const ChatPage = () => {
                                       alt={attachment.name}
                                       className="w-full h-20 object-cover rounded-lg border group-hover:opacity-80 transition-opacity"
                                       onError={(e) => {
-                                        console.error('Image load error:', attachment);
+                                        console.error('Image load error for attachment:', attachment.name);
+                                        console.error('Display URL:', displayUrl.substring(0, 100));
                                         // Fallback to file icon if image fails to load
                                         const target = e.target as HTMLImageElement;
                                         target.style.display = 'none';
@@ -670,6 +670,10 @@ const ChatPage = () => {
                                     src={displayUrl} 
                                     alt={attachment.name}
                                     className="w-full h-auto max-h-[75vh] object-contain"
+                                    onError={(e) => {
+                                      console.error('Dialog image load error for:', attachment.name);
+                                      console.error('Display URL:', displayUrl.substring(0, 100));
+                                    }}
                                   />
                                 </DialogContent>
                               </Dialog>
@@ -679,17 +683,31 @@ const ChatPage = () => {
                                 onClick={() => {
                                   // Create downloadable link for non-image files
                                   if (attachment.content) {
-                                    const blob = new Blob([atob(attachment.content)], { 
-                                      type: attachment.fileType || 'application/octet-stream' 
-                                    });
-                                    const url = URL.createObjectURL(blob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = attachment.name;
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    document.body.removeChild(a);
-                                    URL.revokeObjectURL(url);
+                                    try {
+                                      const binaryString = atob(attachment.content);
+                                      const bytes = new Uint8Array(binaryString.length);
+                                      for (let i = 0; i < binaryString.length; i++) {
+                                        bytes[i] = binaryString.charCodeAt(i);
+                                      }
+                                      const blob = new Blob([bytes], { 
+                                        type: attachment.fileType || 'application/octet-stream' 
+                                      });
+                                      const url = URL.createObjectURL(blob);
+                                      const a = document.createElement('a');
+                                      a.href = url;
+                                      a.download = attachment.name;
+                                      document.body.appendChild(a);
+                                      a.click();
+                                      document.body.removeChild(a);
+                                      URL.revokeObjectURL(url);
+                                    } catch (error) {
+                                      console.error('Error downloading file:', error);
+                                      toast({
+                                        title: "ไม่สามารถดาวน์โหลดไฟล์ได้",
+                                        description: "เกิดข้อผิดพลาดในการดาวน์โหลดไฟล์",
+                                        variant: "destructive",
+                                      });
+                                    }
                                   }
                                 }}
                               >
