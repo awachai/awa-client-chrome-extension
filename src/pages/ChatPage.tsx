@@ -19,15 +19,16 @@ interface Message {
   timestamp: Date;
   imageUrl?: string;
   attachments?: Array<{
-    type: 'image';
+    type: 'image' | 'file';
     content: string;
     name: string;
     url: string;
+    fileType?: string;
   }>;
 }
 
 interface Attachment {
-  type: 'image';
+  type: 'image' | 'file';
   content: string;
   name: string;
 }
@@ -415,7 +416,7 @@ const ChatPage = () => {
     const messageAttachments = selectedFiles.map(file => {
       const key = `${file.name}-${file.size}-${file.lastModified}`;
       return {
-        type: file.type.startsWith('image/') ? 'image' : 'file' as const,
+        type: file.type.startsWith('image/') ? 'image' as const : 'file' as const,
         content: '',
         name: file.name,
         url: file.type.startsWith('image/') ? (filePreviewUrls[key] || '') : '',
