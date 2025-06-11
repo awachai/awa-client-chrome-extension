@@ -555,8 +555,8 @@ export class CommandHandler {
             }, resolve);
           });
 
-          if (response && response.success) {
-            return response;
+          if (response && typeof response === 'object' && 'success' in response && response.success) {
+            return response as any;
           } else {
             console.warn('Background script failed to handle open_url, falling back');
           }
