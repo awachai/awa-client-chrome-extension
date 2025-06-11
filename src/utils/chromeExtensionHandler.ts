@@ -1,3 +1,4 @@
+
 // Chrome Extension Message Handler
 export interface ChromeCommand {
   action: 'highlight' | 'click' | 'scroll_to' | 'get_dom' | 'fill_form' | 'scan_elements';
@@ -8,6 +9,7 @@ export interface ChromeCommand {
 export class ChromeExtensionHandler {
   private isExtensionContext: boolean;
   private currentTabId: number | null = null;
+  private currentWindowId: number | null = null; // เพิ่ม window ID
 
   constructor() {
     // ตรวจสอบว่าอยู่ใน Chrome Extension context หรือไม่
@@ -28,44 +30,46 @@ export class ChromeExtensionHandler {
     try {
       const chrome = (window as any).chrome;
       
-      // ขั้นแรก: ดึง tab ID ของหน้าต่างปัจจุบัน
-      console.log('[CHROME_HANDLER] Getting current tab information...');
+      // ขั้นแรก: ดึง tab ID และ window ID ของหน้าต่างปัจจุบัน
+      console.log('[CHROME_HANDLER] Getting current tab and window information...');
       
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
         if (chrome.runtime.lastError) {
           console.log('[CHROME_HANDLER] Error getting current tab:', chrome.runtime.lastError.message);
-          this.sendSidePanelSignal(null);
+          this.sendSidePanelSignal(null, null);
           return;
         }
         
         if (tabs && tabs.length > 0) {
           this.currentTabId = tabs[0].id;
+          this.currentWindowId = tabs[0].windowId;
           console.log('[CHROME_HANDLER] Found current tab ID:', this.currentTabId);
+          console.log('[CHROME_HANDLER] Found current window ID:', this.currentWindowId);
           console.log('[CHROME_HANDLER] Tab URL:', tabs[0].url);
-          console.log('[CHROME_HANDLER] Window ID:', tabs[0].windowId);
           
-          // ส่งสัญญาณพร้อม tab ID
-          this.sendSidePanelSignal(this.currentTabId);
+          // ส่งสัญญาณพร้อม tab ID และ window ID
+          this.sendSidePanelSignal(this.currentTabId, this.currentWindowId);
         } else {
           console.log('[CHROME_HANDLER] No tabs found');
-          this.sendSidePanelSignal(null);
+          this.sendSidePanelSignal(null, null);
         }
       });
       
     } catch (error) {
       console.error('[CHROME_HANDLER] Error initializing side panel:', error);
-      this.sendSidePanelSignal(null);
+      this.sendSidePanelSignal(null, null);
     }
   }
 
-  private sendSidePanelSignal(tabId: number | null) {
+  private sendSidePanelSignal(tabId: number | null, windowId: number | null) {
     try {
       const chrome = (window as any).chrome;
-      console.log('[CHROME_HANDLER] Sending side panel opened signal with tab ID:', tabId);
+      console.log('[CHROME_HANDLER] Sending side panel opened signal with tab ID:', tabId, 'window ID:', windowId);
       
       chrome.runtime.sendMessage({
         type: 'SIDE_PANEL_OPENED',
-        tabId: tabId
+        tabId: tabId,
+        windowId: windowId // เพิ่ม window ID ในสัญญาณ
       }, (response: any) => {
         if (chrome.runtime.lastError) {
           console.log('[CHROME_HANDLER] Failed to send side panel opened signal:', chrome.runtime.lastError.message);
@@ -90,6 +94,7 @@ export class ChromeExtensionHandler {
     try {
       console.log('[CHROME_HANDLER] === COMMAND EXECUTION START ===');
       console.log('[CHROME_HANDLER] Current tab ID:', this.currentTabId);
+      console.log('[CHROME_HANDLER] Current window ID:', this.currentWindowId);
       console.log('[CHROME_HANDLER] Sending command to background script:', command);
       console.log('[CHROME_HANDLER] Original command for WebSocket response:', originalCommand);
       
@@ -100,6 +105,7 @@ export class ChromeExtensionHandler {
           type: 'EXECUTE_DOM_COMMAND',
           command: command,
           sidePanelTabId: this.currentTabId, // ส่ง tab ID ไปด้วย
+          sidePanelWindowId: this.currentWindowId, // ส่ง window ID ไปด้วย
           originalCommand: originalCommand // ส่ง original command เพื่อใช้ใน WebSocket response
         }, (response: any) => {
           if (chrome.runtime.lastError) {
@@ -129,19 +135,29 @@ export class ChromeExtensionHandler {
     return this.executeCommand({ action: 'scan_elements' });
   }
 
-  // เช็คว่า extension พร้อมใช้งานหรือไม่
   isReady(): boolean {
     return this.isExtensionContext;
   }
 
-  // ทดสอบการเชื่อมต่อกับ content script
   async testConnection(): Promise<any> {
     console.log('[CHROME_HANDLER] Testing connection...');
     return this.executeCommand({ action: 'scan_elements' });
   }
 
-  // ดึง tab ID ปัจจุบัน
+  // ดึง tab ID และ window ID ปัจจุบัน
   getCurrentTabId(): number | null {
     return this.currentTabId;
+  }
+
+  getCurrentWindowId(): number | null {
+    return this.currentWindowId;
+  }
+
+  // ดึงข้อมูลทั้ง tab และ window
+  getCurrentTabInfo(): { tabId: number | null; windowId: number | null } {
+    return {
+      tabId: this.currentTabId,
+      windowId: this.currentWindowId
+    };
   }
 }

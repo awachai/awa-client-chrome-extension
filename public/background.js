@@ -3,8 +3,9 @@ console.log('AI Web Agent Background Script loading...');
 
 // ข้อมูล tabs ที่มี content script พร้อมใช้งาน
 const readyTabs = new Map();
-// tab ID ที่มี side panel เปิดอยู่
+// tab ID และ window ID ที่มี side panel เปิดอยู่
 let sidePanelTabId = null;
+let sidePanelWindowId = null; // เพิ่มการจดจำ window ID
 // WebSocket connection for sending responses back
 let websocketConnection = null;
 
@@ -30,19 +31,27 @@ function logToContent(tabId, message, level = 'log') {
 function sendWebSocketResponse(response) {
   try {
     // ส่งข้อมูลไปยัง side panel เพื่อให้ส่งผ่าน WebSocket
-    if (sidePanelTabId) {
-      chrome.tabs.sendMessage(sidePanelTabId, {
-        type: 'SEND_WEBSOCKET_RESPONSE',
-        response: response
-      }, (sendResponse) => {
-        if (chrome.runtime.lastError) {
-          console.log('[BACKGROUND] Could not send WebSocket response to side panel:', chrome.runtime.lastError.message);
-        } else {
-          console.log('[BACKGROUND] WebSocket response sent via side panel:', response);
+    if (sidePanelTabId && sidePanelWindowId) {
+      // เพิ่มการตรวจสอบ window ID ด้วย
+      chrome.tabs.get(sidePanelTabId, (tab) => {
+        if (chrome.runtime.lastError || !tab || tab.windowId !== sidePanelWindowId) {
+          console.log('[BACKGROUND] Side panel tab/window mismatch or not found');
+          return;
         }
+
+        chrome.tabs.sendMessage(sidePanelTabId, {
+          type: 'SEND_WEBSOCKET_RESPONSE',
+          response: response
+        }, (sendResponse) => {
+          if (chrome.runtime.lastError) {
+            console.log('[BACKGROUND] Could not send WebSocket response to side panel:', chrome.runtime.lastError.message);
+          } else {
+            console.log('[BACKGROUND] WebSocket response sent via side panel:', response);
+          }
+        });
       });
     } else {
-      console.log('[BACKGROUND] No side panel available to send WebSocket response');
+      console.log('[BACKGROUND] No side panel tab/window available to send WebSocket response');
     }
   } catch (error) {
     console.error('[BACKGROUND] Error sending WebSocket response:', error);
@@ -61,9 +70,10 @@ function addReadyTab(tabId, info) {
   logToContent(tabId, `Content script ready on tab ${tabId} (window ${info.windowId}): ${info.url}`);
 }
 
-// ตั้งค่า side panel tab
+// ตั้งค่า side panel tab และ window
 function setSidePanelTab(tabId, windowId) {
   sidePanelTabId = tabId;
+  sidePanelWindowId = windowId;
   logToContent(tabId, `Side panel opened on tab ${tabId} (window ${windowId})`);
 }
 
@@ -74,35 +84,40 @@ function removeTab(tabId) {
   
   // Clear side panel tab ID if it's the one being removed
   if (sidePanelTabId === tabId) {
-    logToContent(tabId, `Side panel tab ${tabId} removed, clearing sidePanelTabId`);
+    logToContent(tabId, `Side panel tab ${tabId} removed, clearing sidePanelTabId and sidePanelWindowId`);
     sidePanelTabId = null;
+    sidePanelWindowId = null;
   }
 }
 
-// Execute command on target tab (ONLY side panel tab, no fallback)
-async function executeCommandOnTargetTab(command, requestSidePanelTabId = null, originalCommand = null) {
+// Execute command on target tab (ONLY side panel tab with matching window, no fallback)
+async function executeCommandOnTargetTab(command, requestSidePanelTabId = null, requestSidePanelWindowId = null, originalCommand = null) {
   try {
     // Handle open_url command specially - it can work without a target tab
     if (command.action === 'open_url') {
       return await handleOpenUrlCommand(command, originalCommand);
     }
 
-    // ใช้ tab ID ที่ส่งมาจาก request ก่อน
+    // ใช้ tab ID และ window ID ที่ส่งมาจาก request ก่อน
     const targetTabId = requestSidePanelTabId || sidePanelTabId;
+    const targetWindowId = requestSidePanelWindowId || sidePanelWindowId;
     
     logToContent(targetTabId, '=== EXECUTE COMMAND DEBUG ===');
     logToContent(targetTabId, `Command: ${JSON.stringify(command)}`);
     logToContent(targetTabId, `Request side panel tab ID: ${requestSidePanelTabId}`);
+    logToContent(targetTabId, `Request side panel window ID: ${requestSidePanelWindowId}`);
     logToContent(targetTabId, `Stored side panel tab ID: ${sidePanelTabId}`);
+    logToContent(targetTabId, `Stored side panel window ID: ${sidePanelWindowId}`);
     logToContent(targetTabId, `Final target tab ID: ${targetTabId}`);
+    logToContent(targetTabId, `Final target window ID: ${targetWindowId}`);
     logToContent(targetTabId, `Available ready tabs: ${Array.from(readyTabs.keys()).join(', ')}`);
     
-    // ตรวจสอบว่ามี side panel tab หรือไม่
-    if (!targetTabId) {
-      logToContent(null, '✗ No side panel tab ID available');
+    // ตรวจสอบว่ามี side panel tab และ window หรือไม่
+    if (!targetTabId || !targetWindowId) {
+      logToContent(null, '✗ No side panel tab/window ID available');
       const errorResponse = { 
         success: false, 
-        error: 'No side panel tab active. User may have closed the panel or switched window.' 
+        error: 'No side panel tab/window active. User may have closed the panel or switched window.' 
       };
       
       // ส่ง WebSocket response สำหรับ error
@@ -115,6 +130,7 @@ async function executeCommandOnTargetTab(command, requestSidePanelTabId = null, 
           selector: originalCommand.selector || '',
           data: { error: errorResponse.error },
           tab_id: targetTabId,
+          window_id: targetWindowId,
           room: originalCommand.room,
           timestamp: new Date().toISOString()
         });
@@ -125,9 +141,37 @@ async function executeCommandOnTargetTab(command, requestSidePanelTabId = null, 
     
     let targetTab = null;
     
-    // ตรวจสอบว่า tab ยังมีอยู่และเข้าถึงได้
+    // ตรวจสอบว่า tab ยังมีอยู่และ window ตรงกัน
     try {
       targetTab = await chrome.tabs.get(targetTabId);
+      
+      // ตรวจสอบว่า window ID ตรงกันหรือไม่
+      if (targetTab.windowId !== targetWindowId) {
+        logToContent(targetTabId, `✗ Side panel tab ${targetTabId} window mismatch - expected: ${targetWindowId}, actual: ${targetTab.windowId}`);
+        const errorResponse = { 
+          success: false, 
+          error: 'Side panel tab window mismatch. User may have moved tab to different window.' 
+        };
+        
+        // ส่ง WebSocket response สำหรับ error
+        if (originalCommand) {
+          sendWebSocketResponse({
+            tranType: 'response',
+            type: originalCommand.type,
+            action: originalCommand.action,
+            message: errorResponse.error,
+            selector: originalCommand.selector || '',
+            data: { error: errorResponse.error },
+            tab_id: targetTabId,
+            window_id: targetWindowId,
+            room: originalCommand.room,
+            timestamp: new Date().toISOString()
+          });
+        }
+        
+        return errorResponse;
+      }
+      
       logToContent(targetTabId, `✓ Side panel tab found - ID: ${targetTab.id}, Window: ${targetTab.windowId}, URL: ${targetTab.url}`);
       
       // ตรวจสอบว่า tab ยังมีอยู่และเข้าถึงได้
@@ -148,6 +192,7 @@ async function executeCommandOnTargetTab(command, requestSidePanelTabId = null, 
             selector: originalCommand.selector || '',
             data: { error: errorResponse.error },
             tab_id: targetTabId,
+            window_id: targetWindowId,
             room: originalCommand.room,
             timestamp: new Date().toISOString()
           });
@@ -158,9 +203,10 @@ async function executeCommandOnTargetTab(command, requestSidePanelTabId = null, 
     } catch (error) {
       logToContent(targetTabId, `✗ Side panel tab ${targetTabId} no longer exists: ${error.message}`);
       
-      // เคลียร์ stored tab ID ถ้าเป็น tab เดียวกัน
+      // เคลียร์ stored tab ID และ window ID ถ้าเป็น tab เดียวกัน
       if (sidePanelTabId === targetTabId) {
         sidePanelTabId = null;
+        sidePanelWindowId = null;
       }
       
       const errorResponse = { 
@@ -178,28 +224,7 @@ async function executeCommandOnTargetTab(command, requestSidePanelTabId = null, 
           selector: originalCommand.selector || '',
           data: { error: errorResponse.error },
           tab_id: targetTabId,
-          room: originalCommand.room,
-          timestamp: new Date().toISOString()
-        });
-      }
-      
-      return errorResponse;
-    }
-    
-    if (!targetTab || !targetTab.id) {
-      logToContent(targetTabId, '✗ No valid target tab found');
-      const errorResponse = { success: false, error: 'No valid target tab found' };
-      
-      // ส่ง WebSocket response สำหรับ error
-      if (originalCommand) {
-        sendWebSocketResponse({
-          tranType: 'response',
-          type: originalCommand.type,
-          action: originalCommand.action,
-          message: errorResponse.error,
-          selector: originalCommand.selector || '',
-          data: { error: errorResponse.error },
-          tab_id: targetTabId,
+          window_id: targetWindowId,
           room: originalCommand.room,
           timestamp: new Date().toISOString()
         });
@@ -285,6 +310,7 @@ async function executeCommandOnTargetTab(command, requestSidePanelTabId = null, 
               selector: originalCommand.selector || '',
               data: { error: errorResponse.error },
               tab_id: targetTab.id,
+              window_id: targetWindowId,
               room: originalCommand.room,
               timestamp: new Date().toISOString()
             });
@@ -306,6 +332,7 @@ async function executeCommandOnTargetTab(command, requestSidePanelTabId = null, 
             selector: originalCommand.selector || '',
             data: { error: errorResponse.error },
             tab_id: targetTab.id,
+            window_id: targetWindowId,
             room: originalCommand.room,
             timestamp: new Date().toISOString()
           });
@@ -338,6 +365,7 @@ async function executeCommandOnTargetTab(command, requestSidePanelTabId = null, 
               selector: originalCommand.selector || '',
               data: { error: errorResponse.error },
               tab_id: targetTab.id,
+              window_id: targetWindowId,
               room: originalCommand.room,
               timestamp: new Date().toISOString()
             });
@@ -358,6 +386,7 @@ async function executeCommandOnTargetTab(command, requestSidePanelTabId = null, 
               selector: originalCommand.selector || '',
               data: result.success ? result : { error: result.error },
               tab_id: targetTab.id,
+              window_id: targetWindowId,
               room: originalCommand.room,
               timestamp: new Date().toISOString()
             });
@@ -382,6 +411,7 @@ async function executeCommandOnTargetTab(command, requestSidePanelTabId = null, 
         selector: originalCommand.selector || '',
         data: { error: errorResponse.error },
         tab_id: 'unknown',
+        window_id: 'unknown',
         room: originalCommand.room,
         timestamp: new Date().toISOString()
       });
@@ -409,6 +439,7 @@ async function handleOpenUrlCommand(command, originalCommand = null) {
           selector: originalCommand.selector || '',
           data: { error: errorResponse.error },
           tab_id: 'background',
+          window_id: 'background',
           room: originalCommand.room,
           timestamp: new Date().toISOString()
         });
@@ -432,6 +463,7 @@ async function handleOpenUrlCommand(command, originalCommand = null) {
           selector: originalCommand.selector || '',
           data: { error: errorResponse.error },
           tab_id: 'background',
+          window_id: 'background',
           room: originalCommand.room,
           timestamp: new Date().toISOString()
         });
@@ -457,7 +489,7 @@ async function handleOpenUrlCommand(command, originalCommand = null) {
     } else {
       // เปิดใน tab ปัจจุบัน (side panel tab ถ้ามี)
       const targetTabId = sidePanelTabId;
-      if (targetTabId) {
+      if (targetTabId && sidePanelWindowId) {
         await chrome.tabs.update(targetTabId, { url });
         result = { 
           success: true, 
@@ -493,6 +525,7 @@ async function handleOpenUrlCommand(command, originalCommand = null) {
         selector: originalCommand.selector || '',
         data: result,
         tab_id: result.tabId || 'background',
+        window_id: sidePanelWindowId || 'background',
         room: originalCommand.room,
         timestamp: new Date().toISOString()
       });
@@ -512,6 +545,7 @@ async function handleOpenUrlCommand(command, originalCommand = null) {
         selector: originalCommand.selector || '',
         data: { error: errorResponse.error },
         tab_id: 'background',
+        window_id: 'background',
         room: originalCommand.room,
         timestamp: new Date().toISOString()
       });
@@ -542,11 +576,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   // Side panel opened signal
   if (message.type === 'SIDE_PANEL_OPENED') {
-    // ใช้ tab ID ที่ส่งมาจาก message หรือ sender tab
+    // ใช้ tab ID และ window ID ที่ส่งมาจาก message หรือ sender tab
     const tabId = message.tabId || (sender.tab ? sender.tab.id : null);
-    const windowId = sender.tab ? sender.tab.windowId : null;
+    const windowId = message.windowId || (sender.tab ? sender.tab.windowId : null);
     
-    if (tabId) {
+    if (tabId && windowId) {
       setSidePanelTab(tabId, windowId);
     }
     sendResponse({ success: true });
@@ -557,11 +591,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'EXECUTE_DOM_COMMAND') {
     console.log(`[BACKGROUND] Command execution request`);
     console.log(`[BACKGROUND] Request side panel tab ID: ${message.sidePanelTabId}`);
+    console.log(`[BACKGROUND] Request side panel window ID: ${message.sidePanelWindowId}`);
     console.log(`[BACKGROUND] Stored side panel tab ID: ${sidePanelTabId}`);
+    console.log(`[BACKGROUND] Stored side panel window ID: ${sidePanelWindowId}`);
     console.log(`[BACKGROUND] Ready tabs: ${Array.from(readyTabs.keys()).join(', ')}`);
     
     // ส่ง originalCommand ไปด้วยเพื่อใช้ในการส่ง WebSocket response
-    executeCommandOnTargetTab(message.command, message.sidePanelTabId, message.originalCommand)
+    executeCommandOnTargetTab(
+      message.command, 
+      message.sidePanelTabId, 
+      message.sidePanelWindowId, // เพิ่ม window ID parameter
+      message.originalCommand
+    )
       .then(result => {
         console.log('[BACKGROUND] Command execution result:', result);
         sendResponse(result);
@@ -612,16 +653,18 @@ chrome.action.onClicked.addListener(async (tab) => {
 
 // Initialize on startup
 chrome.runtime.onStartup.addListener(async () => {
-  console.log('[BACKGROUND] Extension startup - clearing ready tabs and side panel tab');
+  console.log('[BACKGROUND] Extension startup - clearing ready tabs and side panel tab/window');
   readyTabs.clear();
   sidePanelTabId = null;
+  sidePanelWindowId = null;
 });
 
 // Initialize on install
 chrome.runtime.onInstalled.addListener(async () => {
-  console.log('[BACKGROUND] Extension installed/updated - clearing ready tabs and side panel tab');
+  console.log('[BACKGROUND] Extension installed/updated - clearing ready tabs and side panel tab/window');
   readyTabs.clear();
   sidePanelTabId = null;
+  sidePanelWindowId = null;
 });
 
 console.log('[BACKGROUND] Background script initialization complete');

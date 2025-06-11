@@ -6,6 +6,7 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
   const [messages, setMessages] = useState([]);
   const [error, setError] = useState(null);
   const [tabId, setTabId] = useState(null);
+  const [windowId, setWindowId] = useState(null); // เพิ่ม windowId state
   const [room, setRoom] = useState(null);
   const ws = useRef(null);
   const reconnectTimeoutRef = useRef(null);
@@ -13,7 +14,7 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
   const maxReconnectAttempts = 5;
   const isConnecting = useRef(false);
 
-  // Get current tab ID and room information
+  // Get current tab ID and window ID information
   const getCurrentTabInfo = useCallback(async () => {
     try {
       // Try to get tab ID from Chrome extension if available
@@ -21,22 +22,28 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
         const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
         if (tabs.length > 0) {
           const currentTabId = tabs[0].id;
+          const currentWindowId = tabs[0].windowId;
           setTabId(currentTabId);
-          console.log('Got tab ID from Chrome extension:', currentTabId);
-          return currentTabId;
+          setWindowId(currentWindowId);
+          console.log('Got tab info from Chrome extension - Tab ID:', currentTabId, 'Window ID:', currentWindowId);
+          return { tabId: currentTabId, windowId: currentWindowId };
         }
       }
       
       // Fallback: generate a unique tab ID based on session
       const fallbackTabId = `web_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const fallbackWindowId = `window_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       setTabId(fallbackTabId);
-      console.log('Generated fallback tab ID:', fallbackTabId);
-      return fallbackTabId;
+      setWindowId(fallbackWindowId);
+      console.log('Generated fallback tab info - Tab ID:', fallbackTabId, 'Window ID:', fallbackWindowId);
+      return { tabId: fallbackTabId, windowId: fallbackWindowId };
     } catch (error) {
       console.error('Error getting tab info:', error);
       const fallbackTabId = `web_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const fallbackWindowId = `window_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       setTabId(fallbackTabId);
-      return fallbackTabId;
+      setWindowId(fallbackWindowId);
+      return { tabId: fallbackTabId, windowId: fallbackWindowId };
     }
   }, []);
 
@@ -48,7 +55,9 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
 
     try {
       // Get tab info before connecting
-      const currentTabId = await getCurrentTabInfo();
+      const tabInfo = await getCurrentTabInfo();
+      const currentTabId = tabInfo.tabId;
+      const currentWindowId = tabInfo.windowId;
       
       // Use room from authData if available, otherwise fallback to user-based room
       const currentRoom = authData?.room || `room_${user}_${currentTabId}`;
@@ -66,6 +75,7 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
       
       console.log('Attempting WebSocket connection to:', wsUrl);
       console.log('Tab ID:', currentTabId);
+      console.log('Window ID:', currentWindowId);
       console.log('Room:', currentRoom);
       console.log('Auth Data:', authData);
       console.log('Token in URL:', authData?.token ? 'Yes' : 'No');
@@ -80,13 +90,14 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
         reconnectAttempts.current = 0;
         isConnecting.current = false;
 
-        // Send initial connection info
+        // Send initial connection info with window ID
         const connectionInfo = {
           tranType: 'auth',
           type: 'connection',
           action: 'connect',
           message: 'Connected successfully',
           tab_id: currentTabId,
+          window_id: currentWindowId, // เพิ่ม window_id
           room: currentRoom,
           data: {
             user: user,
@@ -201,12 +212,13 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
     }
   }, []);
 
-  // ฟังก์ชันสำหรับส่ง response กลับเซิร์ฟเวอร์
+  // ฟังก์ชันสำหรับส่ง response กลับเซิร์ฟเวอร์ พร้อม window_id
   const sendResponse = useCallback((responseCommand) => {
-    // เพิ่ม tab_id และ room ใน response
+    // เพิ่ม tab_id, window_id และ room ใน response
     const enhancedResponse = {
       ...responseCommand,
       tab_id: tabId,
+      window_id: windowId, // เพิ่ม window_id
       room: room,
       token: authData?.token || null,
       timestamp: new Date().toISOString()
@@ -220,7 +232,7 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
       console.log('✅ Response sent successfully via WebSocket:', enhancedResponse);
       
       // ส่ง console log ไปยัง content script ด้วย
-      if (typeof chrome !== 'undefined' && chrome.tabs && tabId) {
+      if (typeof chrome !== 'undefined' && chrome.tabs && tabId && windowId) {
         try {
           // ถ้าเป็น Chrome Extension context ให้ส่ง log ไป content script
           chrome.tabs.sendMessage(parseInt(tabId), {
@@ -241,7 +253,7 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
     }
     
     return sent;
-  }, [sendMessage, tabId, room, authData]);
+  }, [sendMessage, tabId, windowId, room, authData]);
 
   const clearError = useCallback(() => {
     setError(null);
@@ -267,6 +279,7 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
     messages,
     error,
     tabId,
+    windowId, // export windowId
     room,
     sendMessage,
     sendResponse,
