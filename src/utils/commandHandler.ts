@@ -22,7 +22,7 @@ export interface TextCommand extends BaseCommand {
 export interface CommandAction extends BaseCommand {
   tranType: 'request';
   type: 'command';
-  action: 'highlight' | 'click' | 'scroll_to' | 'get_dom' | 'popup' | 'fill_form' | 'scan_elements';
+  action: 'highlight' | 'click' | 'scroll_to' | 'get_dom' | 'popup' | 'fill_form' | 'scan_elements' | 'open_url';
   selector?: string;
   message?: string;
   data?: any;
@@ -233,6 +233,9 @@ export class CommandHandler {
         return this.chromeHandler.executeCommand({
           action: 'scan_elements'
         }, originalCommand);
+
+      case 'open_url':
+        return this.openUrl(command.data?.url, command.data?.newTab);
       
       case 'popup':
         return this.showPopup(command.message!);
@@ -261,6 +264,9 @@ export class CommandHandler {
       
       case 'fill_form':
         return this.fillForm(command.data!);
+
+      case 'open_url':
+        return this.openUrl(command.data?.url, command.data?.newTab);
       
       default:
         return { success: false, error: `Unknown action: ${command.action}` };
@@ -520,5 +526,75 @@ export class CommandHandler {
     });
 
     return { success: true, action: 'fill_form', results };
+  }
+
+  private async openUrl(url: string, newTab: boolean = true) {
+    try {
+      if (!url) {
+        return { success: false, error: 'URL is required' };
+      }
+
+      // Validate URL format
+      try {
+        new URL(url);
+      } catch (error) {
+        return { success: false, error: 'Invalid URL format' };
+      }
+
+      // ถ้าเป็น Chrome Extension context ให้ใช้ chrome.tabs API
+      if (typeof chrome !== 'undefined' && chrome.tabs) {
+        try {
+          if (newTab) {
+            // เปิดใน tab ใหม่
+            await chrome.tabs.create({ url });
+            return { 
+              success: true, 
+              action: 'open_url', 
+              url,
+              opened: 'new_tab',
+              message: `เปิด URL ใน tab ใหม่: ${url}`
+            };
+          } else {
+            // เปิดใน tab ปัจจุบัน
+            const [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (currentTab && currentTab.id) {
+              await chrome.tabs.update(currentTab.id, { url });
+              return { 
+                success: true, 
+                action: 'open_url', 
+                url,
+                opened: 'current_tab',
+                message: `เปิด URL ใน tab ปัจจุบัน: ${url}`
+              };
+            }
+          }
+        } catch (chromeError) {
+          console.warn('Chrome tabs API failed, falling back to window.open:', chromeError);
+        }
+      }
+
+      // Fallback สำหรับ web context หรือถ้า Chrome API ไม่ทำงาน
+      if (newTab) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+        return { 
+          success: true, 
+          action: 'open_url', 
+          url,
+          opened: 'new_window',
+          message: `เปิด URL ในหน้าต่างใหม่: ${url}`
+        };
+      } else {
+        window.location.href = url;
+        return { 
+          success: true, 
+          action: 'open_url', 
+          url,
+          opened: 'current_window',
+          message: `เปิด URL ในหน้าต่างปัจจุบัน: ${url}`
+        };
+      }
+    } catch (error) {
+      return { success: false, error: `Failed to open URL: ${error}` };
+    }
   }
 }

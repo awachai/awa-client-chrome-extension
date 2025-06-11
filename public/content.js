@@ -197,6 +197,9 @@
 
           case 'scan_elements':
             return this.scanElements();
+
+          case 'open_url':
+            return this.openUrl(command.data?.url, command.data?.newTab);
           
           default:
             console.log('[AUTH_LOG] Unknown command action:', command.action);
@@ -438,6 +441,47 @@
         };
       } catch (error) {
         return { success: false, error: `Failed to scan elements: ${error.message}` };
+      }
+    }
+
+    static openUrl(url, newTab = true) {
+      try {
+        if (!url) {
+          return { success: false, error: 'URL is required' };
+        }
+
+        // Validate URL format
+        try {
+          new URL(url);
+        } catch (error) {
+          return { success: false, error: 'Invalid URL format' };
+        }
+
+        console.log(`[AUTH_LOG] Opening URL: ${url} (newTab: ${newTab})`);
+
+        if (newTab) {
+          // เปิดใน window ใหม่
+          window.open(url, '_blank', 'noopener,noreferrer');
+          return { 
+            success: true, 
+            action: 'open_url', 
+            url,
+            opened: 'new_window',
+            message: `เปิด URL ในหน้าต่างใหม่: ${url}`
+          };
+        } else {
+          // เปิดใน window ปัจจุบัน
+          window.location.href = url;
+          return { 
+            success: true, 
+            action: 'open_url', 
+            url,
+            opened: 'current_window',
+            message: `เปิด URL ในหน้าต่างปัจจุบัน: ${url}`
+          };
+        }
+      } catch (error) {
+        return { success: false, error: `Failed to open URL: ${error.message}` };
       }
     }
   };

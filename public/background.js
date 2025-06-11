@@ -1,4 +1,3 @@
-
 // Background Script - จัดการการสื่อสาร
 console.log('AI Web Agent Background Script loading...');
 
@@ -83,6 +82,11 @@ function removeTab(tabId) {
 // Execute command on target tab (ONLY side panel tab, no fallback)
 async function executeCommandOnTargetTab(command, requestSidePanelTabId = null, originalCommand = null) {
   try {
+    // Handle open_url command specially - it can work without a target tab
+    if (command.action === 'open_url') {
+      return await handleOpenUrlCommand(command, originalCommand);
+    }
+
     // ใช้ tab ID ที่ส่งมาจาก request ก่อน
     const targetTabId = requestSidePanelTabId || sidePanelTabId;
     
@@ -378,6 +382,136 @@ async function executeCommandOnTargetTab(command, requestSidePanelTabId = null, 
         selector: originalCommand.selector || '',
         data: { error: errorResponse.error },
         tab_id: 'unknown',
+        room: originalCommand.room,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    return errorResponse;
+  }
+}
+
+// Handle open_url command
+async function handleOpenUrlCommand(command, originalCommand = null) {
+  try {
+    const url = command.data?.url;
+    const newTab = command.data?.newTab !== false; // default to true
+
+    if (!url) {
+      const errorResponse = { success: false, error: 'URL is required' };
+      
+      if (originalCommand) {
+        sendWebSocketResponse({
+          tranType: 'response',
+          type: originalCommand.type,
+          action: originalCommand.action,
+          message: errorResponse.error,
+          selector: originalCommand.selector || '',
+          data: { error: errorResponse.error },
+          tab_id: 'background',
+          room: originalCommand.room,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      return errorResponse;
+    }
+
+    // Validate URL format
+    try {
+      new URL(url);
+    } catch (error) {
+      const errorResponse = { success: false, error: 'Invalid URL format' };
+      
+      if (originalCommand) {
+        sendWebSocketResponse({
+          tranType: 'response',
+          type: originalCommand.type,
+          action: originalCommand.action,
+          message: errorResponse.error,
+          selector: originalCommand.selector || '',
+          data: { error: errorResponse.error },
+          tab_id: 'background',
+          room: originalCommand.room,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      return errorResponse;
+    }
+
+    console.log(`[BACKGROUND] Opening URL: ${url} (newTab: ${newTab})`);
+
+    let result;
+    if (newTab) {
+      // เปิดใน tab ใหม่
+      const newTab = await chrome.tabs.create({ url });
+      result = { 
+        success: true, 
+        action: 'open_url', 
+        url,
+        opened: 'new_tab',
+        tabId: newTab.id,
+        message: `เปิด URL ใน tab ใหม่: ${url}`
+      };
+    } else {
+      // เปิดใน tab ปัจจุบัน (side panel tab ถ้ามี)
+      const targetTabId = sidePanelTabId;
+      if (targetTabId) {
+        await chrome.tabs.update(targetTabId, { url });
+        result = { 
+          success: true, 
+          action: 'open_url', 
+          url,
+          opened: 'current_tab',
+          tabId: targetTabId,
+          message: `เปิด URL ใน tab ปัจจุบัน: ${url}`
+        };
+      } else {
+        // ถ้าไม่มี side panel tab ให้เปิดใน tab ใหม่
+        const newTab = await chrome.tabs.create({ url });
+        result = { 
+          success: true, 
+          action: 'open_url', 
+          url,
+          opened: 'new_tab',
+          tabId: newTab.id,
+          message: `เปิด URL ใน tab ใหม่: ${url}`
+        };
+      }
+    }
+
+    console.log(`[BACKGROUND] ✓ URL opened successfully:`, result);
+
+    // ส่ง WebSocket response สำหรับ success
+    if (originalCommand) {
+      sendWebSocketResponse({
+        tranType: 'response',
+        type: originalCommand.type,
+        action: originalCommand.action,
+        message: result.message,
+        selector: originalCommand.selector || '',
+        data: result,
+        tab_id: result.tabId || 'background',
+        room: originalCommand.room,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    return result;
+  } catch (error) {
+    console.error('[BACKGROUND] ✗ Failed to open URL:', error);
+    const errorResponse = { success: false, error: `Failed to open URL: ${error.message}` };
+    
+    if (originalCommand) {
+      sendWebSocketResponse({
+        tranType: 'response',
+        type: originalCommand.type,
+        action: originalCommand.action,
+        message: errorResponse.error,
+        selector: originalCommand.selector || '',
+        data: { error: errorResponse.error },
+        tab_id: 'background',
         room: originalCommand.room,
         timestamp: new Date().toISOString()
       });
