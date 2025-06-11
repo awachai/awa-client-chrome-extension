@@ -1,200 +1,893 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Settings, Bug, X, RefreshCw } from 'lucide-react';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { useWebSocket } from '../hooks/useWebSocket';
-import { CommandHandler } from '../utils/commandHandler';
-import { ChromeExtensionHandler } from '../utils/chromeExtensionHandler';
-import { debug_mode } from '../config/env';
-import { useAuth } from '../hooks/useAuth';
+import React from 'react';
+import { Bot, Send, Wifi, WifiOff, RotateCcw, User, Bug, Paperclip, X, Upload, Eye, FileText, Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import { CommandHandler } from '@/utils/commandHandler';
+import { useAuth } from '@/hooks/useAuth';
+import { useIsMobile } from '@/hooks/use-mobile';
 
-const ChatPage: React.FC = () => {
-  const { user, authData, logout } = useAuth();
-  const { 
-    isConnected, 
-    messages, 
-    error, 
-    tabId, 
-    windowId, // เพิ่ม windowId
-    room, 
-    sendMessage, 
-    sendResponse, 
-    retry, 
-    clearError 
-  } = useWebSocket(user || 'guest', authData);
-  
-  const [inputMessage, setInputMessage] = useState('');
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const chatBoxRef = useRef<HTMLDivElement>(null);
-  const chromeHandler = new ChromeExtensionHandler();
+interface Message {
+  id: string;
+  type: 'user' | 'ai' | 'debug';
+  content: string;
+  timestamp: Date;
+  imageUrl?: string;
+  attachments?: Array<{
+    type: 'image' | 'file';
+    content: string;
+    name: string;
+    url: string;
+    fileType?: string;
+  }>;
+}
 
-  const handleSendMessage = () => {
-    if (inputMessage.trim()) {
-      const message = {
-        id: `user-${Date.now()}`,
-        type: 'user',
-        content: inputMessage,
-        timestamp: new Date(),
-        tranType: 'request',
-        action: 'send_message'
+interface Attachment {
+  type: 'image' | 'file';
+  content: string;
+  name: string;
+}
+
+const ChatPage = () => {
+  const [messages, setMessages] = React.useState<Message[]>([]);
+  const [inputMessage, setInputMessage] = React.useState('');
+  const [isProcessing, setIsProcessing] = React.useState(false);
+  const [debugMode, setDebugMode] = React.useState(false);
+  const [selectedFiles, setSelectedFiles] = React.useState<File[]>([]);
+  const [isDragOver, setIsDragOver] = React.useState(false);
+  const [filePreviewUrls, setFilePreviewUrls] = React.useState<{[key: string]: string}>({});
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const { toast } = useToast();
+  const { authData, logout } = useAuth();
+  const isMobile = useIsMobile();
+
+  // Helper function to send console logs to content script
+  const sendConsoleLog = (message: string, level: 'log' | 'info' | 'warn' | 'error' = 'log') => {
+    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.tabs) {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+          chrome.tabs.sendMessage(tabs[0].id!, {
+            type: 'CONSOLE_LOG',
+            message: message,
+            level: level
+          });
+        }
+      });
+    }
+  };
+
+  const parseJsonFromText = (text: string) => {
+    try {
+      const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/) || text.match(/```\s*([\s\S]*?)\s*```/);
+      if (jsonMatch) {
+        const jsonText = jsonMatch[1].trim();
+        const parsed = JSON.parse(jsonText);
+        return { isJson: true, data: parsed };
+      }
+      
+      const parsed = JSON.parse(text);
+      return { isJson: true, data: parsed };
+    } catch {
+      return { isJson: false };
+    }
+  };
+
+  // File handling functions
+  const validateFiles = (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    return fileArray.filter(file => {
+      // รองรับไฟล์หลายประเภท
+      if (file.type.startsWith('image/')) {
+        return file.size <= 10 * 1024 * 1024; // 10MB limit for images
+      }
+      // รองรับไฟล์ประเภทอื่นๆ
+      if (file.type === 'application/pdf' || 
+          file.type.startsWith('text/') ||
+          file.type === 'application/msword' ||
+          file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        return file.size <= 50 * 1024 * 1024; // 50MB limit for documents
+      }
+      return false;
+    });
+  };
+
+  const createFilePreviewUrl = (file: File): string => {
+    return URL.createObjectURL(file);
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files) {
+      const validFiles = validateFiles(files);
+      
+      if (validFiles.length !== files.length) {
+        toast({
+          title: "ไฟล์บางไฟล์ไม่สามารถแนบได้",
+          description: "รองรับรูปภาพ (≤10MB) และเอกสาร (≤50MB)",
+          variant: "destructive",
+        });
+      }
+      
+      // Create preview URLs for new files
+      const newPreviewUrls: {[key: string]: string} = {};
+      validFiles.forEach(file => {
+        const key = `${file.name}-${file.size}-${file.lastModified}`;
+        if (file.type.startsWith('image/')) {
+          newPreviewUrls[key] = createFilePreviewUrl(file);
+        }
+      });
+      
+      setFilePreviewUrls(prev => ({ ...prev, ...newPreviewUrls }));
+      setSelectedFiles(prev => [...prev, ...validFiles]);
+    }
+  };
+
+  // Drag and Drop handlers
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Only set dragOver to false if we're leaving the entire drop zone
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const validFiles = validateFiles(files);
+      
+      if (validFiles.length !== files.length) {
+        toast({
+          title: "ไฟล์บางไฟล์ไม่สามารถแนบได้",
+          description: "รองรับรูปภาพ (≤10MB) และเอกสาร (≤50MB)",
+          variant: "destructive",
+        });
+      }
+      
+      if (validFiles.length > 0) {
+        // Create preview URLs for drag & dropped files
+        const newPreviewUrls: {[key: string]: string} = {};
+        validFiles.forEach(file => {
+          const key = `${file.name}-${file.size}-${file.lastModified}`;
+          if (file.type.startsWith('image/')) {
+            newPreviewUrls[key] = createFilePreviewUrl(file);
+          }
+        });
+        
+        setFilePreviewUrls(prev => ({ ...prev, ...newPreviewUrls }));
+        setSelectedFiles(prev => [...prev, ...validFiles]);
+        
+        toast({
+          title: "แนบไฟล์สำเร็จ",
+          description: `แนบไฟล์ ${validFiles.length} ไฟล์แล้ว`,
+        });
+      }
+    }
+  };
+
+  const removeFile = (index: number) => {
+    const fileToRemove = selectedFiles[index];
+    const key = `${fileToRemove.name}-${fileToRemove.size}-${fileToRemove.lastModified}`;
+    
+    // Revoke the object URL to free memory
+    if (filePreviewUrls[key]) {
+      URL.revokeObjectURL(filePreviewUrls[key]);
+    }
+    
+    setFilePreviewUrls(prev => {
+      const newUrls = { ...prev };
+      delete newUrls[key];
+      return newUrls;
+    });
+    
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1];
+        resolve(base64);
       };
-      sendMessage(message);
-      setInputMessage('');
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // WebSocket connection with auth data
+  const { isConnected, messages: wsMessages, error: wsError, sendMessage, retry, clearError, tabId, room } = useWebSocket('nueng', authData);
+
+  const commandHandler = new CommandHandler({
+    onTextMessage: (message: string) => {
+      const aiMessage: Message = {
+        id: `ai-${Date.now()}`,
+        type: 'ai',
+        content: message,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, aiMessage]);
+    },
+    onImageReceived: (imageUrl: string) => {
+      const imageMessage: Message = {
+        id: `ai-image-${Date.now()}`,
+        type: 'ai',
+        content: 'รูปภาพถูกส่งมาแล้ว',
+        timestamp: new Date(),
+        imageUrl
+      };
+      setMessages(prev => [...prev, imageMessage]);
+    },
+    onConfirmRequest: async (message: string) => {
+      return window.confirm(message);
+    },
+    onDebugMessage: (message: string) => {
+      if (message) {
+        const debugMessage: Message = {
+          id: `debug-${Date.now()}`,
+          type: 'debug',
+          content: message,
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, debugMessage]);
+      }
+    },
+    sendWebSocketMessage: sendMessage
+  });
+
+  React.useEffect(() => {
+    if (wsMessages.length > 0) {
+      const latestMessage = wsMessages[wsMessages.length - 1];
+      
+      // เฉพาะ debug logs ที่สำคัญ
+      if (debugMode) {
+        sendConsoleLog(`📨 New WebSocket message: ${JSON.stringify(latestMessage)}`);
+      }
+      
+      // ตรวจสอบว่าเป็น JSON command structure หรือไม่ - แก้ไขให้ตรวจสอบ tranType ด้วย
+      if (latestMessage.tranType === 'request' && latestMessage.type === 'command' && latestMessage.action) {
+        sendConsoleLog('🎯 DETECTED JSON COMMAND - Processing...', 'info');
+        
+        // แสดง debug message
+        if (debugMode) {
+          const debugMessage: Message = {
+            id: `debug-${Date.now()}`,
+            type: 'debug',
+            content: `🎯 Processing command: ${latestMessage.action} on ${latestMessage.selector || 'no selector'}`,
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, debugMessage]);
+        }
+        
+        // ส่งคำสั่งไปยัง Chrome Extension
+        if (typeof chrome !== 'undefined' && chrome.runtime) {
+          const commandPayload = {
+            type: 'EXECUTE_DOM_COMMAND',
+            command: latestMessage,
+            sidePanelTabId: tabId,
+            originalCommand: latestMessage
+          };
+          
+          sendConsoleLog(`📤 Sending command to Chrome Extension: ${latestMessage.action}`, 'info');
+          
+          chrome.runtime.sendMessage(commandPayload, (response) => {
+            if (chrome.runtime.lastError) {
+              sendConsoleLog(`❌ Chrome extension error: ${chrome.runtime.lastError.message}`, 'error');
+              
+              // ส่ง error response กลับ
+              const errorResponse = {
+                tranType: 'response',
+                type: 'command',
+                action: latestMessage.action,
+                message: `error: ${chrome.runtime.lastError.message}`,
+                selector: latestMessage.selector || '',
+                tab_id: tabId,
+                room: room,
+                timestamp: new Date().toISOString()
+              };
+              
+              sendMessage(errorResponse);
+              
+              if (debugMode) {
+                const debugMessage: Message = {
+                  id: `debug-${Date.now()}`,
+                  type: 'debug',
+                  content: `❌ Command failed: ${chrome.runtime.lastError.message}`,
+                  timestamp: new Date()
+                };
+                setMessages(prev => [...prev, debugMessage]);
+              }
+            } else {
+              sendConsoleLog(`✅ Command executed successfully: ${JSON.stringify(response)}`, 'info');
+              
+              // ตรวจสอบ response และสร้าง message ที่เหมาะสม
+              const isSuccess = response && (response.success === true || response.message === 'success');
+              const responseMessage = isSuccess ? 'success' : (response?.error || response?.message || 'unknown error');
+              
+              // ส่ง success response กลับ
+              const successResponse = {
+                tranType: 'response',
+                type: 'command',
+                action: latestMessage.action,
+                message: responseMessage,
+                selector: latestMessage.selector || '',
+                tab_id: tabId,
+                room: room,
+                timestamp: new Date().toISOString()
+              };
+              
+              sendMessage(successResponse);
+              
+              if (debugMode) {
+                const debugMessage: Message = {
+                  id: `debug-${Date.now()}`,
+                  type: 'debug',
+                  content: `✅ Command completed: ${responseMessage}`,
+                  timestamp: new Date()
+                };
+                setMessages(prev => [...prev, debugMessage]);
+              }
+            }
+          });
+        } else {
+          sendConsoleLog('⚠️ Chrome extension not available, using fallback', 'warn');
+          
+          // Fallback ไปใช้ CommandHandler แบบเดิม
+          commandHandler.executeCommand(latestMessage).then(result => {
+            if (result) {
+              const response = {
+                tranType: 'response',
+                type: 'command',
+                action: latestMessage.action,
+                message: result.message || 'completed',
+                selector: latestMessage.selector || '',
+                tab_id: tabId,
+                room: room,
+                timestamp: new Date().toISOString()
+              };
+              
+              sendMessage(response);
+              
+              if (debugMode) {
+                const debugMessage: Message = {
+                  id: `debug-${Date.now()}`,
+                  type: 'debug',
+                  content: `Fallback command completed: ${response.message}`,
+                  timestamp: new Date()
+                };
+                setMessages(prev => [...prev, debugMessage]);
+              }
+            }
+          });
+        }
+      } else {
+        // สำหรับข้อความทั่วไปที่ไม่ใช่ command
+        if (latestMessage.tranType === 'request' && latestMessage.type !== 'command') {
+          commandHandler.executeCommand(latestMessage);
+        } else if (!latestMessage.tranType) {
+          // ข้อความแบบเก่าที่ไม่มี tranType structure
+          commandHandler.executeCommand(latestMessage);
+        }
+      }
+    }
+  }, [wsMessages, debugMode, tabId, room, sendMessage]);
+
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim() && selectedFiles.length === 0) return;
+    if (!isConnected) {
+      toast({
+        title: "ไม่ได้เชื่อมต่อ",
+        description: "กรุณารอการเชื่อมต่อ WebSocket",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    
+    // Convert files to base64 first
+    const attachments: Attachment[] = [];
+    for (const file of selectedFiles) {
+      try {
+        const base64Content = await convertFileToBase64(file);
+        attachments.push({
+          type: file.type.startsWith('image/') ? 'image' : 'file',
+          content: base64Content,
+          name: file.name
+        });
+      } catch (error) {
+        console.error('Error converting file to base64:', error);
+      }
+    }
+    
+    // Create attachments with base64 content for the message display
+    const messageAttachments = attachments.map(attachment => ({
+      type: attachment.type,
+      content: attachment.content,
+      name: attachment.name,
+      url: attachment.type === 'image' ? `data:${selectedFiles.find(f => f.name === attachment.name)?.type || 'image/jpeg'};base64,${attachment.content}` : '',
+      fileType: selectedFiles.find(f => f.name === attachment.name)?.type
+    }));
+    
+    const userMessage: Message = {
+      id: `user-${Date.now()}`,
+      type: 'user',
+      content: inputMessage || (selectedFiles.length > 0 ? `แนบไฟล์ ${selectedFiles.length} ไฟล์` : ''),
+      timestamp: new Date(),
+      attachments: messageAttachments
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    
+    const parseResult = parseJsonFromText(inputMessage);
+    
+    const wsMessage = {
+      type: 'user_message',
+      content: inputMessage,
+      attachments,
+      timestamp: new Date().toISOString(),
+      isJsonCommand: parseResult.isJson,
+      jsonData: parseResult.isJson ? parseResult.data : null,
+      room: authData?.room || null,
+      token: authData?.token || null
+    };
+    
+    const sent = sendMessage(wsMessage);
+    
+    if (sent) {
+      sendConsoleLog('Message sent successfully via WebSocket');
+    } else {
+      toast({
+        title: "ส่งข้อความไม่สำเร็จ",
+        description: "ไม่สามารถส่งข้อความได้",
+        variant: "destructive",
+      });
+    }
+    
+    setInputMessage('');
+    
+    // Clean up file preview URLs
+    selectedFiles.forEach(file => {
+      const key = `${file.name}-${file.size}-${file.lastModified}`;
+      if (filePreviewUrls[key]) {
+        URL.revokeObjectURL(filePreviewUrls[key]);
+      }
+    });
+    
+    setSelectedFiles([]);
+    setFilePreviewUrls({});
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    setIsProcessing(false);
+  };
+
+  const handleLogout = () => {
+    logout();
+    window.location.href = '/';
+  };
+
+  // Function to auto-resize textarea
+  const adjustTextareaHeight = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      const maxHeight = window.innerHeight * 0.5; // 50% of viewport height
+      const scrollHeight = textarea.scrollHeight;
+      textarea.style.height = Math.min(scrollHeight, maxHeight) + 'px';
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
+  // Update the input change handler
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputMessage(e.target.value);
+    adjustTextareaHeight();
   };
 
-  useEffect(() => {
-    // Scroll to bottom on new messages
-    if (chatBoxRef.current) {
-      chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
-    }
-  }, [messages]);
+  // Auto-adjust height when component mounts or input message changes
+  React.useEffect(() => {
+    adjustTextareaHeight();
+  }, [inputMessage]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      {/* Debug Panel */}
-      {debug_mode && (
-        <Card className="mb-4 border-orange-200 bg-orange-50">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-orange-800">
-                <Bug className="w-4 h-4 inline mr-2" />
-                Debug Information
-              </CardTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => window.location.reload()}
-                className="text-orange-600 hover:text-orange-800"
-              >
-                <RefreshCw className="w-4 h-4" />
-              </Button>
+    <div 
+      className="flex flex-col h-screen bg-gray-50"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {isDragOver && (
+        <div className="fixed inset-0 bg-blue-500 bg-opacity-20 z-50 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-lg shadow-lg border-2 border-dashed border-blue-500 text-center">
+            <Upload className="h-12 w-12 text-blue-500 mx-auto mb-2" />
+            <p className="text-lg font-semibold text-blue-700">ปล่อยไฟล์ที่นี่เพื่อแนบ</p>
+            <p className="text-sm text-gray-600">รองรับรูปภาพขนาดไม่เกิน 10MB</p>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 p-3 md:p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2 md:space-x-3">
+            <Bot className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
+            <div>
+              <h1 className="text-lg md:text-xl font-kanit font-semibold">AI Web Agent</h1>
+              <div className="flex items-center space-x-1 md:space-x-2 flex-wrap">
+                {isConnected ? (
+                  <Badge variant="default" className="bg-green-100 text-green-800 text-xs">
+                    <Wifi className="h-2 w-2 md:h-3 md:w-3 mr-1" />
+                    เชื่อมต่อแล้ว
+                  </Badge>
+                ) : (
+                  <Badge variant="destructive" className="text-xs">
+                    <WifiOff className="h-2 w-2 md:h-3 md:w-3 mr-1" />
+                    ไม่ได้เชื่อมต่อ
+                  </Badge>
+                )}
+                {authData && (
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 text-xs">
+                    <User className="h-2 w-2 md:h-3 md:w-3 mr-1" />
+                    {authData.room}
+                  </Badge>
+                )}
+              </div>
             </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <span className="font-medium text-orange-700">Connection:</span>{' '}
-                <Badge variant={isConnected ? "default" : "destructive"} className="ml-1">
-                  {isConnected ? 'Connected' : 'Disconnected'}
-                </Badge>
-              </div>
-              <div>
-                <span className="font-medium text-orange-700">Tab ID:</span>{' '}
-                <code className="bg-orange-100 px-1 rounded text-orange-800">
-                  {tabId || 'Not Set'}
-                </code>
-              </div>
-              <div>
-                <span className="font-medium text-orange-700">Window ID:</span>{' '}
-                <code className="bg-orange-100 px-1 rounded text-orange-800">
-                  {windowId || 'Not Set'}
-                </code>
-              </div>
-              <div>
-                <span className="font-medium text-orange-700">Room:</span>{' '}
-                <code className="bg-orange-100 px-1 rounded text-orange-800">
-                  {room || 'Not Set'}
-                </code>
-              </div>
-              <div>
-                <span className="font-medium text-orange-700">Messages:</span>{' '}
-                <Badge variant="outline" className="ml-1">
-                  {messages.length}
-                </Badge>
-              </div>
-              <div>
-                <span className="font-medium text-orange-700">Token:</span>{' '}
-                <Badge variant={authData?.token ? "default" : "secondary"} className="ml-1">
-                  {authData?.token ? 'Present' : 'None'}
-                </Badge>
-              </div>
-              <div className="col-span-2">
-                <span className="font-medium text-orange-700">Extension:</span>{' '}
-                <Badge variant={chromeHandler.isReady() ? "default" : "secondary"} className="ml-1">
-                  {chromeHandler.isReady() ? 'Available' : 'Not Available'}
-                </Badge>
-              </div>
+          </div>
+          <div className="flex items-center space-x-1 md:space-x-2">
+            <Button 
+              variant={debugMode ? "default" : "outline"} 
+              size="sm" 
+              onClick={() => setDebugMode(!debugMode)}
+              className={`text-xs ${debugMode ? "bg-orange-500 hover:bg-orange-600" : ""}`}
+            >
+              <Bug className="h-3 w-3 md:h-4 md:w-4 mr-1" />
+              {isMobile ? '' : 'Debug'}
+            </Button>
+            {wsError && (
+              <Button variant="outline" size="sm" onClick={retry} className="text-xs">
+                <RotateCcw className="h-3 w-3 md:h-4 md:w-4 mr-1" />
+                {isMobile ? '' : 'ลองใหม่'}
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={handleLogout} className="text-xs">
+              {isMobile ? 'ออก' : 'ออกจากระบบ'}
+            </Button>
+          </div>
+        </div>
+        
+        {/* Debug Panel - Mobile Optimized */}
+        {debugMode && (
+          <div className="mt-3 p-2 md:p-3 bg-gray-100 rounded-lg">
+            <h3 className="text-xs md:text-sm font-semibold mb-2">Debug Information</h3>
+            <div className={`grid ${isMobile ? 'grid-cols-1 gap-2' : 'grid-cols-2 gap-4'} text-xs`}>
+              <div><strong>Connection:</strong> {isConnected ? 'Connected' : 'Disconnected'}</div>
+              <div><strong>Tab ID:</strong> {tabId || 'N/A'}</div>
+              <div><strong>Room:</strong> {room || 'N/A'}</div>
+              <div><strong>Messages:</strong> {wsMessages.length}</div>
+              <div><strong>Token:</strong> {authData?.token ? 'Present' : 'None'}</div>
+              <div><strong>Extension:</strong> {typeof chrome !== 'undefined' && chrome.runtime ? 'Available' : 'Not Available'}</div>
             </div>
             
-            {/* Latest Messages Preview */}
-            {messages.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-orange-200">
-                <div className="font-medium text-orange-700 text-xs mb-2">Latest Messages:</div>
-                <div className="space-y-1 max-h-20 overflow-y-auto">
-                  {messages.slice(-3).map((msg, idx) => (
-                    <div key={idx} className="text-xs text-orange-600 truncate">
-                      <span className="font-medium">
-                        {msg.type === 'user' ? 'You' : 'AI'}:
-                      </span>{' '}
-                      {typeof msg.content === 'string' 
-                        ? msg.content.substring(0, 50) + (msg.content.length > 50 ? '...' : '')
-                        : JSON.stringify(msg.content).substring(0, 50) + '...'
-                      }
+            {wsMessages.length > 0 && (
+              <div className="mt-2">
+                <strong className="text-xs">Latest Messages:</strong>
+                <div className="max-h-24 md:max-h-32 overflow-y-auto mt-1 bg-white p-2 rounded text-xs">
+                  {wsMessages.slice(-3).map((msg, index) => (
+                    <div key={index} className="mb-1 p-1 border-b border-gray-200 last:border-b-0">
+                      <div className="font-mono break-all">{JSON.stringify(msg, null, isMobile ? 0 : 2)}</div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        )}
+      </div>
+
+      {/* Messages */}
+      <ScrollArea className="flex-1 p-2 md:p-4">
+        <div className="space-y-3 md:space-y-4 max-w-4xl mx-auto">
+          {messages.map((message) => (
+            <Card key={message.id} className={`p-3 md:p-4 ${
+              message.type === 'user' 
+                ? 'bg-blue-50 border-blue-200 ml-auto max-w-sm md:max-w-md' 
+                : message.type === 'debug'
+                ? 'bg-yellow-50 border-yellow-200'
+                : 'bg-white border-gray-200 mr-auto max-w-sm md:max-w-md'
+            }`}>
+              <div className="flex items-start space-x-2 md:space-x-3">
+                {message.type === 'user' ? (
+                  <User className="h-4 w-4 md:h-5 md:w-5 text-blue-600 mt-1 flex-shrink-0" />
+                ) : (
+                  <Bot className="h-4 w-4 md:h-5 md:w-5 text-gray-600 mt-1 flex-shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs md:text-sm text-gray-500 mb-1">
+                    {message.type === 'user' ? 'คุณ' : message.type === 'debug' ? 'Debug' : 'AI'}
+                    <span className="ml-2">
+                      {message.timestamp.toLocaleTimeString('th-TH')}
+                    </span>
+                  </div>
+                  {message.content && (
+                    <div className="text-sm md:text-base text-gray-900 whitespace-pre-wrap break-words mb-2">
+                      {message.content}
+                    </div>
+                  )}
+                  
+                  {/* Display message attachments */}
+                  {message.attachments && message.attachments.length > 0 && (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                      {message.attachments.map((attachment, index) => {
+                        // Use attachment.url if available, otherwise create from base64 content
+                        const displayUrl = attachment.url || 
+                          (attachment.content ? `data:${attachment.fileType || 'image/jpeg'};base64,${attachment.content}` : '');
+                        
+                        console.log('Attachment display URL:', displayUrl.substring(0, 50) + '...');
+                        
+                        return (
+                          <div key={index}>
+                            {attachment.type === 'image' ? (
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <div className="relative cursor-pointer group">
+                                    <img 
+                                      src={displayUrl} 
+                                      alt={attachment.name}
+                                      className="w-full h-20 object-cover rounded-lg border group-hover:opacity-80 transition-opacity"
+                                      onError={(e) => {
+                                        console.error('Image load error for attachment:', attachment.name);
+                                        console.error('Display URL:', displayUrl.substring(0, 100));
+                                        // Fallback to file icon if image fails to load
+                                        const target = e.target as HTMLImageElement;
+                                        target.style.display = 'none';
+                                        const parent = target.parentElement;
+                                        if (parent) {
+                                          parent.innerHTML = `
+                                            <div class="w-full h-20 bg-gray-100 border rounded-lg flex items-center justify-center">
+                                              <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                              </svg>
+                                            </div>
+                                          `;
+                                        }
+                                      }}
+                                    />
+                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity rounded-lg flex items-center justify-center">
+                                      <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                  </div>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-4xl max-h-[80vh] p-0">
+                                  <img 
+                                    src={displayUrl} 
+                                    alt={attachment.name}
+                                    className="w-full h-auto max-h-[75vh] object-contain"
+                                    onError={(e) => {
+                                      console.error('Dialog image load error for:', attachment.name);
+                                      console.error('Display URL:', displayUrl.substring(0, 100));
+                                    }}
+                                  />
+                                </DialogContent>
+                              </Dialog>
+                            ) : (
+                              <div 
+                                className="p-3 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+                                onClick={() => {
+                                  // Create downloadable link for non-image files
+                                  if (attachment.content) {
+                                    try {
+                                      const binaryString = atob(attachment.content);
+                                      const bytes = new Uint8Array(binaryString.length);
+                                      for (let i = 0; i < binaryString.length; i++) {
+                                        bytes[i] = binaryString.charCodeAt(i);
+                                      }
+                                      const blob = new Blob([bytes], { 
+                                        type: attachment.fileType || 'application/octet-stream' 
+                                      });
+                                      const url = URL.createObjectURL(blob);
+                                      const a = document.createElement('a');
+                                      a.href = url;
+                                      a.download = attachment.name;
+                                      document.body.appendChild(a);
+                                      a.click();
+                                      document.body.removeChild(a);
+                                      URL.revokeObjectURL(url);
+                                    } catch (error) {
+                                      console.error('Error downloading file:', error);
+                                      toast({
+                                        title: "ไม่สามารถดาวน์โหลดไฟล์ได้",
+                                        description: "เกิดข้อผิดพลาดในการดาวน์โหลดไฟล์",
+                                        variant: "destructive",
+                                      });
+                                    }
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center space-x-2">
+                                  {attachment.fileType?.includes('pdf') ? (
+                                    <FileText className="h-4 w-4 text-red-600" />
+                                  ) : attachment.fileType?.includes('word') ? (
+                                    <FileText className="h-4 w-4 text-blue-600" />
+                                  ) : (
+                                    <Paperclip className="h-4 w-4 text-gray-600" />
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-900 truncate" title={attachment.name}>
+                                      {attachment.name}
+                                    </p>
+                                    <p className="text-xs text-gray-500 flex items-center">
+                                      {attachment.fileType || 'ไฟล์เอกสาร'}
+                                      <Download className="h-3 w-3 ml-1" />
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  
+                  {message.imageUrl && (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <div className="mt-2 cursor-pointer group relative">
+                          <img 
+                            src={message.imageUrl} 
+                            alt="Generated content" 
+                            className="max-w-full h-auto rounded-lg border group-hover:opacity-80 transition-opacity"
+                          />
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity rounded-lg flex items-center justify-center">
+                            <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </div>
+                        </div>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-4xl max-h-[80vh] p-0">
+                        <img 
+                          src={message.imageUrl} 
+                          alt="Generated content" 
+                          className="w-full h-auto max-h-[75vh] object-contain"
+                        />
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </ScrollArea>
+
+      {/* File Preview with Thumbnails */}
+      {selectedFiles.length > 0 && (
+        <div className="bg-white border-t border-gray-200 p-2 md:p-3">
+          <div className="max-w-4xl mx-auto">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {selectedFiles.map((file, index) => {
+                const key = `${file.name}-${file.size}-${file.lastModified}`;
+                const previewUrl = filePreviewUrls[key];
+                const isImage = file.type.startsWith('image/');
+                
+                return (
+                  <div key={index} className="relative group">
+                    <div className="relative">
+                      {isImage && previewUrl ? (
+                        <img 
+                          src={previewUrl} 
+                          alt={file.name}
+                          className="w-full h-20 object-cover rounded-lg border"
+                        />
+                      ) : (
+                        <div className="w-full h-20 bg-gray-100 border rounded-lg flex items-center justify-center">
+                          <Paperclip className="h-6 w-6 text-gray-400" />
+                        </div>
+                      )}
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => removeFile(index)}
+                        className="absolute -top-2 -right-2 p-1 h-6 w-6 rounded-full"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1 truncate" title={file.name}>
+                      {file.name}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {file.type || 'ไฟล์เอกสาร'}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       )}
 
-      <div className="container mx-auto max-w-2xl">
-        <Card className="bg-white shadow-md rounded-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-2xl font-bold">AI Chat</CardTitle>
-            <Button variant="ghost" onClick={() => setSettingsOpen(!settingsOpen)}>
-              <Settings className="w-5 h-5" />
-            </Button>
-          </CardHeader>
-
-          <CardContent className="px-4 py-2">
-            <div
-              ref={chatBoxRef}
-              className="space-y-2 h-64 overflow-y-auto mb-2"
+      {/* Input */}
+      <div className="bg-white border-t border-gray-200 p-2 md:p-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-end space-x-2">
+            <Textarea
+              ref={textareaRef}
+              value={inputMessage}
+              onChange={handleInputChange}
+              placeholder="พิมพ์ข้อความหรือ JSON command... หรือลากวางไฟล์ลงในหน้าต่าง"
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              disabled={!isConnected || isProcessing}
+              className="flex-1 text-sm md:text-base resize-none min-h-[2.5rem] max-h-[50vh] overflow-y-auto"
+              style={{ height: 'auto' }}
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,.pdf,.doc,.docx,.txt"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <Button 
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={!isConnected || isProcessing}
+              size="sm"
+              className="flex-shrink-0"
             >
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex flex-col rounded-lg p-3 w-fit max-w-[80%] ${msg.type === 'user' ? 'bg-blue-100 ml-auto items-end' : 'bg-gray-100 mr-auto'
-                    }`}
-                >
-                  <div className="text-sm text-gray-800">{msg.content}</div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {new Date(msg.timestamp).toLocaleTimeString()}
-                  </div>
-                </div>
-              ))}
+              <Paperclip className="h-4 w-4" />
+            </Button>
+            <Button 
+              onClick={handleSendMessage}
+              disabled={!isConnected || isProcessing || (!inputMessage.trim() && selectedFiles.length === 0)}
+              size="sm"
+              className="flex-shrink-0"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+          {wsError && (
+            <div className="mt-2 text-xs md:text-sm text-red-600 bg-red-50 p-2 rounded">
+              {wsError}
             </div>
-
-            <Separator className="my-2" />
-
-            <div className="flex items-center space-x-2">
-              <Input
-                placeholder="Send a message..."
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="flex-grow rounded-full py-2"
-              />
-              <Button onClick={handleSendMessage} className="rounded-full">
-                <Send className="w-4 h-4 mr-2" />
-                Send
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+          )}
+        </div>
       </div>
     </div>
   );
