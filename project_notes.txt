@@ -1,4 +1,5 @@
 
+
 PROJECT NOTES - AI WEB AGENT DEVELOPMENT
 ========================================
 
@@ -20,7 +21,7 @@ PROJECT NOTES - AI WEB AGENT DEVELOPMENT
 
 ========================================
 
-วันที่: 2025-06-03
+วันที่: 2025-06-11
 เวลา: การอัปเดตไฟล์บันทึกโปรเจ็ค
 
 สรุปความเข้าใจโปรเจ็ค:
@@ -35,25 +36,29 @@ PROJECT NOTES - AI WEB AGENT DEVELOPMENT
 
 2. JSON Command System
    - ระบบคำสั่งในรูปแบบ JSON สำหรับควบคุม DOM elements
-   - รองรับคำสั่งต่างๆ เช่น click, highlight, scroll_to
+   - รองรับคำสั่งต่างๆ เช่น click, highlight, scroll_to, open_url
    - ตัวอย่างคำสั่ง: {"tranType":"request","type":"command","action":"click","message":"","selector":"#fQuote > div:nth-child(4) > button"}
    - **[WORKING]** ระบบตอบกลับในรูปแบบ: {"tranType":"response","type":"command","action":"click","message":"success","selector":"#fQuote > div:nth-child(4) > button"}
+   - **[FIXED 2025-06-11]** คำสั่ง open_url ได้รับการแก้ไขให้ใช้ stored tab/window ID แทนการเปิด tab ใหม่
 
 3. Chrome Extension Components
    - Background script (background.js)
    - Content script (content.js) 
    - Side panel interface
    - Message handling system
+   - **[WORKING]** Tab และ Window Management System
 
 4. React UI Components
    - ChatPage: หน้าหลักสำหรับแชทกับ AI
    - LoginPage: หน้า authentication
    - Debug mode: สำหรับตรวจสอบสถานะการเชื่อมต่อ
+   - **[WORKING]** แสดง Tab ID และ Room information ใน debug panel
 
 5. หน้าที่หลักของระบบ
    - ใช้ AI สำหรับควบคุมการทำงานบนเว็บไซต์ต่างๆ
    - ส่งคำสั่งผ่าน WebSocket ไปยัง server
    - ประมวลผลคำสั่งและดำเนินการบน DOM
+   - **[WORKING]** จัดการ tab และ window ที่เฉพาะเจาะจงแทนการเปิดใหม่
 
 ปัญหาที่แก้ไขได้แล้ว:
 --------------------
@@ -65,283 +70,44 @@ PROJECT NOTES - AI WEB AGENT DEVELOPMENT
 - **[FIXED 2025-06-03]** เพิ่ม Image Thumbnail และ Full View - แสดง thumbnail และดูรูปเต็มได้
 - **[FIXED 2025-06-03]** ปัญหาการแสดงรูปในโหมด full view - ใช้ base64 content แทน URL
 - **[FIXED 2025-06-03]** Auto-resizing Textarea - ช่องพิมพ์ข้อความปรับขนาดตามเนื้อหาอัตโนมัติ
+- **[FIXED 2025-06-11]** TypeScript error ใน commandHandler.ts - แก้ไข type definition แล้ว
+- **[FIXED 2025-06-11]** คำสั่ง open_url เปิด tab ใหม่แทนที่จะใช้ tab ที่บันทึกไว้ - แก้ไขให้ใช้ stored tab/window ID
+- **[FIXED 2025-06-11]** ปัญหาการเข้าถึง user property ใน ChatPage - แก้ไข destructuring จาก useAuth hook
 
-การแก้ไขล่าสุด (2025-06-03):
+การแก้ไขล่าสุด (2025-06-11):
 ============================
 
-### 1. JSON Command System (เก่า):
-**ปัญหาที่พบเมื่อก่อน:**
-- ส่ง command มาแล้วระบบไม่ทำงาน
-- การตรวจสอบ JSON command structure ใน ChatPage.tsx ไม่ถูกต้อง
+### 1. Tab และ Window Management System:
+**ปัญหาที่พบ:**
+- คำสั่ง open_url ยังคงเปิด tab ใหม่แทนที่จะใช้ tab ที่บันทึกไว้
+- ขาดการแสดง Window ID ใน debug information
 
-**การแก้ไข (เก่า):**
-- ปรับปรุงการตรวจสอบ JSON command ใน ChatPage.tsx
-- เพิ่มการ log เพื่อ debug และติดตามการทำงาง
+**การแก้ไข:**
+- ปรับปรุงระบบ open_url ให้ใช้ stored tab และ window ID
+- เพิ่มการแสดง Window ID ใน debug panel
+- แก้ไข command handling ให้ทำงานกับ tab ที่เฉพาะเจาะจง
 
-### 2. Drag and Drop File Functionality:
-**ฟีเจอร์ที่เพิ่ม:**
-- รองรับการลากวางไฟล์รูปภาพ (Drag and Drop) ใน ChatPage
-- แสดง visual overlay เมื่อลากไฟล์เข้ามา
-- รองรับไฟล์รูปภาพทุกประเภท (image/*) ขนาดสูงสุด 10MB
+### 2. TypeScript Error Resolution:
+**ปัญหาที่พบ:**
+- Property 'user' does not exist on type ใน ChatPage.tsx
+- TypeScript compilation errors ใน commandHandler.ts
 
-### 3. Image Thumbnail และ Full View Functionality:
-**ฟีเจอร์ที่เพิ่ม:**
-- แสดง thumbnail รูปภาพที่แนบก่อนส่ง
-- แสดง thumbnail รูปภาพในข้อความที่ส่งแล้ว
-- สามารถคลิกดูรูปแบบเต็มใน modal dialog
-- รองรับทั้ง desktop และ mobile
+**การแก้ไข:**
+- แก้ไขการ destructure จาก useAuth hook
+- ปรับปรุง type definitions ใน commandHandler.ts
+- รองรับ authData แทน user property
 
-**Implementation Details:**
-1. **Image Preview ก่อนส่ง:**
-   - แสดง thumbnail ขนาด 80x80px พร้อม rounded corners
-   - มีปุ่ม X สำหรับลบไฟล์
-   - ใช้ object-cover เพื่อรักษาสัดส่วนรูป
+### 3. Code Rollback และ Version Control:
+**เหตุการณ์ที่เกิดขึ้น:**
+- User ทำการ rollback หลายครั้งเพื่อกลับไปยังเวอร์ชันที่ stable
+- Rollback ไปยัง commit 306dca0: "Fix open_url to use stored tab/window"
+- Rollback ไปยัง commit e08d789: "Fix: Access user property in ChatPage"
+- Rollback ไปยัง commit 4f9a9f0: "Fix: Resolve TypeScript error in commandHandler.ts"
 
-2. **Image Display ในข้อความ:**
-   - แสดง thumbnail ขนาด 150x150px ใน message
-   - คลิกเพื่อดูรูปเต็มใน modal
-   - ใช้ Radix UI Dialog component
-
-3. **Full View Modal:**
-   - แสดงรูปเต็มขนาดใน dialog overlay
-   - สามารถปิดได้ด้วยการคลิกปุ่ม X หรือคลิกนอกรูป
-   - รองรับ responsive design
-   - **[FIXED]** ใช้ base64 content แทน URL สำหรับการแสดงรูป
-
-4. **State Management:**
-   - เพิ่ม `selectedImage` state สำหรับควบคุม modal
-   - จัดการการเปิด/ปิด modal ผ่าง `setSelectedImage`
-
-### 4. Auto-resizing Textarea (ใหม่ 2025-06-03):
-**ฟีเจอร์ที่เพิ่ม:**
-- เปลี่ยนจาก Input เป็น Textarea สำหรับการพิมพ์ข้อความ
-- ปรับขนาดความสูงอัตโนมัติตามเนื้อหา
-- จำกัดความสูงสูงสุดไม่เกิน 50% ของความสูงหน้าจอ
-- รองรับการกด Enter เพื่อส่งข้อความ (Shift+Enter สำหรับขึ้นบรรทัดใหม่)
-
-**Implementation Details:**
-1. **Textarea Configuration:**
-   - ใช้ ref เพื่อควบคุม textarea element
-   - กำหนด min-height: 2.5rem และ max-height: 50vh
-   - ใช้ resize-none เพื่อป้องกันการปรับขนาดด้วยตนเอง
-   - เพิ่ม overflow-y-auto สำหรับ scrolling เมื่อเนื้อหาเกิน
-
-2. **Auto-resize Logic:**
-   ```javascript
-   const adjustTextareaHeight = () => {
-     const textarea = textareaRef.current;
-     if (textarea) {
-       textarea.style.height = 'auto';
-       const maxHeight = window.innerHeight * 0.5; // 50% of viewport height
-       const scrollHeight = textarea.scrollHeight;
-       textarea.style.height = Math.min(scrollHeight, maxHeight) + 'px';
-     }
-   };
-   ```
-
-3. **Event Handlers:**
-   - `handleInputChange`: อัปเดต state และปรับขนาด textarea
-   - `onKeyPress`: จัดการการกด Enter สำหรับส่งข้อความ
-   - `useEffect`: ปรับขนาดเมื่อ inputMessage เปลี่ยนแปลง
-
-4. **Layout Changes:**
-   - เปลี่ยน flex layout เป็น `items-end` เพื่อจัดตำแหน่งปุ่มส่ง
-   - textarea และปุ่มส่งจะ align ที่ด้านล่าง
-
-**ผลลัพธ์:**
-- ผู้ใช้สามารถพิมพ์ข้อความยาวๆ ได้สะดวกขึ้น
-- UI ปรับขนาดอัตโนมัติตามเนื้อหา
-- ไม่เกินขอบเขตที่กำหนด (50% ของหน้าจอ)
-- รองรับทั้ง desktop และ mobile
-
-**Technical Implementation:**
-```javascript
-// Auto-resizing textarea component
-<Textarea
-  ref={textareaRef}
-  value={inputMessage}
-  onChange={handleInputChange}
-  placeholder="พิมพ์ข้อความหรือ JSON command... หรือลากวางไฟล์ลงในหน้าต่าง"
-  onKeyPress={(e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  }}
-  disabled={!isConnected || isProcessing}
-  className="flex-1 text-sm md:text-base resize-none min-h-[2.5rem] max-h-[50vh] overflow-y-auto"
-  style={{ height: 'auto' }}
-/>
-```
-
-### บทเรียนสำคัญ:
-**การตรวจสอบ JSON Command ต้องทำอย่างถูกต้อง:**
-- ต้องตรวจสอบ `tranType === 'request'` เพื่อแยกระหว่าง request และ response
-- ต้องตรวจสอบ `type === 'command'` เพื่อระบุว่าเป็น command message
-- ต้องตรวจสอบ `action` ที่มีค่า เพื่อระบุการกระทำที่ต้องทำ
-- **หากขาดการตรวจสอบใดการตรวจสอบหนึ่ง command จะไม่ถูกประมวลผล**
-
-**การเพิ่ม Drag and Drop:**
-- ต้องจัดการ dragenter/dragleave อย่างระมัดระวังเพื่อป้องกัน flickering
-- ใช้ dragCounter เพื่อติดตาม nested drag events
-- ต้อง preventDefault() ใน dragover และ drop events
-- ควรมี visual feedback ที่ชัดเจนสำหรับผู้ใช้
-
-**การเพิ่ม Image Thumbnail และ Full View:**
-- ใช้ object-cover สำหรับ thumbnail เพื่อรักษาสัดส่วน
-- ใช้ Radix UI Dialog สำหรับ modal ที่ accessible
-- จัดการ state สำหรับ selectedImage อย่างถูกต้อง
-- ต้องพิจารณา responsive design สำหรับหน้าจอขนาดต่างๆ
-- **สำคัญ: ใช้ base64 content สำหรับการแสดงรูปใน modal แทน URL**
-
-**การเพิ่ม Auto-resizing Textarea:**
-- ใช้ ref เพื่อควบคุม DOM element โดยตรง
-- คำนวณ scrollHeight และจำกัดด้วย maxHeight
-- จัดการ keyboard events สำหรับ Enter และ Shift+Enter
-- ใช้ useEffect เพื่อปรับขนาดเมื่อ content เปลี่ยน
-- ต้องพิจารณา layout alignment เมื่อ textarea มีขนาดแตกต่างกัน
-
-### Template การตรวจสอบ JSON Command ที่ถูกต้อง:
-```javascript
-useEffect(() => {
-  if (!wsMessage) return;
-  
-  try {
-    const message = JSON.parse(wsMessage);
-    
-    // สำหรับ command request
-    if (message.tranType === 'request' && 
-        message.type === 'command' && 
-        message.action) {
-      
-      console.log('Processing command:', message);
-      // ประมวลผล command
-      handleJsonCommand(message);
-    }
-    
-    // สำหรับ response กลับ
-    if (message.tranType === 'response') {
-      console.log('Received response:', message);
-      // จัดการ response
-    }
-    
-  } catch (error) {
-    console.error('Failed to parse WebSocket message:', error);
-  }
-}, [wsMessage]);
-```
-
-### Template สำหรับ Image Thumbnail และ Full View:
-```javascript
-// State สำหรับ modal
-const [selectedImage, setSelectedImage] = useState(null);
-
-// Thumbnail component
-const ImageThumbnail = ({ imageData, size = "w-20 h-20" }) => (
-  <img
-    src={imageData} // ใช้ base64 content โดยตรง
-    alt="Image"
-    className={`${size} object-cover rounded cursor-pointer`}
-    onClick={() => setSelectedImage(imageData)}
-  />
-);
-
-// Full view modal
-<Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
-  <DialogContent className="max-w-4xl max-h-[90vh]">
-    <img
-      src={selectedImage} // ใช้ base64 content โดยตรง
-      alt="Full size image"
-      className="w-full h-auto max-h-[80vh] object-contain"
-    />
-  </DialogContent>
-</Dialog>
-```
-
-### Template สำหรับ Auto-resizing Textarea:
-```javascript
-// State และ ref
-const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-// Auto-resize function
-const adjustTextareaHeight = () => {
-  const textarea = textareaRef.current;
-  if (textarea) {
-    textarea.style.height = 'auto';
-    const maxHeight = window.innerHeight * 0.5; // 50% of viewport height
-    const scrollHeight = textarea.scrollHeight;
-    textarea.style.height = Math.min(scrollHeight, maxHeight) + 'px';
-  }
-};
-
-// Input change handler
-const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-  setInputMessage(e.target.value);
-  adjustTextareaHeight();
-};
-
-// Auto-adjust effect
-useEffect(() => {
-  adjustTextareaHeight();
-}, [inputMessage]);
-
-// Textarea component
-<Textarea
-  ref={textareaRef}
-  value={inputMessage}
-  onChange={handleInputChange}
-  onKeyPress={(e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  }}
-  className="flex-1 resize-none min-h-[2.5rem] max-h-[50vh] overflow-y-auto"
-  style={{ height: 'auto' }}
-/>
-```
-
-### Template สำหรับ Drag and Drop Implementation:
-```javascript
-// State management
-const [isDragOver, setIsDragOver] = useState(false);
-const [dragCounter, setDragCounter] = useState(0);
-
-// Event handlers
-const handleDragEnter = (e) => {
-  e.preventDefault();
-  setDragCounter(prev => prev + 1);
-  setIsDragOver(true);
-};
-
-const handleDragLeave = (e) => {
-  e.preventDefault();
-  setDragCounter(prev => {
-    const newCounter = prev - 1;
-    if (newCounter === 0) {
-      setIsDragOver(false);
-    }
-    return newCounter;
-  });
-};
-
-const handleDragOver = (e) => {
-  e.preventDefault();
-};
-
-const handleDrop = (e) => {
-  e.preventDefault();
-  setIsDragOver(false);
-  setDragCounter(0);
-  
-  const files = Array.from(e.dataTransfer.files);
-  const imageFiles = files.filter(file => file.type.startsWith('image/'));
-  
-  if (imageFiles.length > 0) {
-    handleFileSelect({ target: { files: imageFiles } });
-  }
-};
-```
+**บทเรียนที่ได้:**
+- การทดสอบต้องทำอย่างละเอียดก่อน commit
+- TypeScript errors ต้องแก้ไขให้หมดก่อนการ deploy
+- Version control ใน Lovable ทำงานได้ดีและช่วยในการ recovery
 
 สถานะการพัฒนา:
 --------------
@@ -353,10 +119,12 @@ const handleDrop = (e) => {
 - **[WORKING]** ระบบ logging ส่งไปยัง content script
 - **[WORKING]** Mobile Responsive Design
 - **[WORKING]** ระบบแนบไฟล์รูปภาพ
-- **[WORKING]** Drag and Drop file functionality - ลากวางไฟล์ได้แล้ว
-- **[WORKING]** Image Thumbnail และ Full View - แสดง thumbnail และดูรูปเต็มได้แล้ว (แก้ไข base64 display แล้ว)
-- **[WORKING]** Auto-resizing Textarea - ช่องพิมพ์ข้อความปรับขนาดอัตโนมัติตามเนื้อหา
+- **[WORKING]** Drag and Drop file functionality
+- **[WORKING]** Image Thumbnail และ Full View
+- **[WORKING]** Auto-resizing Textarea
 - **[WORKING]** Chrome Extension integration กับ DOM manipulation
+- **[WORKING]** Tab และ Window Management System
+- **[WORKING]** คำสั่ง open_url ใช้ stored tab/window ID แทนการเปิดใหม่
 
 รายละเอียดหน้าต่างๆ ในระบบ:
 ============================
@@ -399,40 +167,27 @@ const handleDrop = (e) => {
    - **[FIXED]** ใช้ base64 content สำหรับแสดงรูปใน modal
 
    ระบบพิมพ์ข้อความ:
-   - **[NEW]** ใช้ Textarea แทน Input สำหรับการพิมพ์ข้อความ
-   - **[NEW]** ปรับขนาดความสูงอัตโนมัติตามเนื้อหา
-   - **[NEW]** จำกัดความสูงสูงสุดไม่เกิน 50% ของหน้าจอ
-   - **[NEW]** รองรับ Enter เพื่อส่งข้อความ, Shift+Enter เพื่อขึ้นบรรทัดใหม่
-   - **[NEW]** Layout ปรับให้ปุ่มส่งอยู่ชิดด้านล่างของ textarea
+   - **[WORKING]** ใช้ Textarea แทน Input สำหรับการพิมพ์ข้อความ
+   - **[WORKING]** ปรับขนาดความสูงอัตโนมัติตามเนื้อหา
+   - **[WORKING]** จำกัดความสูงสูงสุดไม่เกิน 50% ของหน้าจอ
+   - **[WORKING]** รองรับ Enter เพื่อส่งข้อความ, Shift+Enter เพื่อขึ้นบรรทัดใหม่
+   - **[WORKING]** Layout ปรับให้ปุ่มส่งอยู่ชิดด้านล่างของ textarea
 
    Debug Mode:
    - แสดงข้อมูลการเชื่อมต่อ WebSocket
-   - แสดง Tab ID และ Room ที่ใช้งาน
+   - แสดง Tab ID และ Window ID ที่ใช้งาน
+   - แสดง Room ที่ใช้งาน
    - แสดงจำนวน WebSocket messages
    - แสดงสถานะ Chrome Extension
    - แสดง Latest WebSocket Messages (5 ข้อความล่าสุด)
    - ปรับให้เหมาะกับ Mobile (แสดง 3 ข้อความ, JSON แบบ compact)
 
-   Mobile Responsive:
-   - ปรับขนาดฟอนต์และ spacing สำหรับหน้าจอเล็ก
-   - Debug panel แสดงแบบ 1 คอลัมน์บน mobile
-   - ปุ่มต่างๆ ปรับขนาดและซ่อนข้อความบางส่วน
-   - ข้อความในแชทปรับ max-width ให้เหมาะสม
-   - File preview ปรับให้แสดงได้ดีบน mobile
-   - **[WORKING]** Image thumbnails และ modal ปรับให้เหมาะกับ mobile
-   - **[NEW]** Auto-resizing textarea รองรับ mobile
-   - Drag and Drop รองรับบน mobile browser ที่รองรับ
-
-   Message Types:
-   - User messages: ข้อความจากผู้ใช้ (สีฟ้า)
-   - AI messages: ข้อความจาก AI (สีขาว)
-   - Debug messages: ข้อความ debug (สีเหลือง)
-   - **[WORKING]** รองรับการแสดงรูปภาพในข้อความพร้อม thumbnail
-
    Chrome Extension Integration:
    - **[WORKING]** ส่งคำสั่ง JSON ไปยัง Background Script
    - **[WORKING]** รับผลลัพธ์การดำเนินการกลับมา
    - **[WORKING]** ส่ง console logs ไปยัง Content Script
+   - **[WORKING]** Tab และ Window Management
+   - **[WORKING]** คำสั่ง open_url ใช้ stored tab แทนการเปิดใหม่
    - รองรับ fallback เมื่อ Chrome Extension ไม่พร้อมใช้งาน
 
 4. หน้า NotFound (/*) - Error Page
@@ -447,13 +202,15 @@ Chrome Extension Components:
    - จัดการ Chrome Extension lifecycle
    - รับและประมวลผลคำสั่งจาก Side Panel
    - ส่งคำสั่งไปยัง Content Script
-   - จัดการ Tab Management
+   - **[WORKING]** จัดการ Tab และ Window Management
+   - **[WORKING]** เก็บ stored tab ID และ window ID
 
 2. Content Script (content.js)
    - รันบนหน้าเว็บที่ผู้ใช้เปิด
    - ดำเนินการ DOM manipulation
    - รับคำสั่งจาก Background Script
    - ส่งผลลัพธ์กลับ
+   - **[WORKING]** รองรับคำสั่ง open_url กับ tab ที่เฉพาะเจาะจง
 
 3. Side Panel (React App)
    - UI หลักของ Chrome Extension
@@ -464,29 +221,67 @@ Chrome Extension Components:
 -----------------
 - เปิด debug mode เพื่อดูสถานะการเชื่อมต่อ
 - ตรวจสอบ WebSocket messages ใน debug panel
+- ตรวจสอบ Tab ID และ Window ID ใน debug information
 - ตรวจสอบ console logs สำหรับ debugging (logs จะแสดงใน tab ที่มี content script)
 - **[WORKING]** ส่ง JSON command ในรูปแบบ {"tranType":"request","type":"command","action":"click","selector":"..."}
+- **[WORKING]** คำสั่ง open_url จะใช้ tab ที่บันทึกไว้แทนการเปิดใหม่
 - **[WORKING]** ลากวางไฟล์รูปภาพเข้าในหน้าแชทได้โดยตรง
 - **[WORKING]** คลิกที่ thumbnail เพื่อดูรูปเต็มในโหมด modal
-- **[NEW]** พิมพ์ข้อความยาวๆ ได้ในช่องแชทที่ปรับขนาดอัตโนมัติ
-- **[NEW]** ใช้ Shift+Enter เพื่อขึ้นบรรทัดใหม่, Enter เพื่อส่งข้อความ
+- **[WORKING]** พิมพ์ข้อความยาวๆ ได้ในช่องแชทที่ปรับขนาดอัตโนมัติ
+- **[WORKING]** ใช้ Shift+Enter เพื่อขึ้นบรรทัดใหม่, Enter เพื่อส่งข้อความ
 
 การอัปเดตล่าสุด:
 ---------------
-วันที่: 2025-06-03
-เวลา: 16:30 น.
-- **[FINAL FIX]** แก้ไขปัญหาการตรวจสอบ JSON command structure ใน ChatPage.tsx
+วันที่: 2025-06-11
+เวลา: 17:30 น.
+- **[FIXED 2025-06-11]** แก้ไขปัญหา TypeScript error ใน commandHandler.ts
+- **[FIXED 2025-06-11]** แก้ไขคำสั่ง open_url ให้ใช้ stored tab/window ID
+- **[FIXED 2025-06-11]** แก้ไขปัญหาการเข้าถึง user property ใน ChatPage.tsx
+- **[UPDATED 2025-06-11]** เพิ่มการแสดง Window ID ใน debug panel
+- **[ROLLBACK 2025-06-11]** ทำการ rollback หลายครั้งเพื่อกลับไปยังเวอร์ชันที่ stable
 - ระบบ JSON command ทำงานได้สมบูรณ์แล้ว
-- สามารถส่งคำสั่ง click, highlight, scroll_to ได้ตามปกติ
-- เพิ่มการ log เพื่อ debug และติดตามการทำงาน
-- **[COMPLETED 2025-06-03]** เพิ่ม Drag and Drop functionality สำหรับไฟล์รูปภาพ
-- **[COMPLETED 2025-06-03]** เพิ่ม Image Thumbnail และ Full View functionality
-- **[FIXED 2025-06-03]** แก้ไขปัญหาการแสดงรูปใน modal dialog ใช้ base64 content
-- **[NEW 2025-06-03]** เพิ่ม Auto-resizing Textarea สำหรับการพิมพ์ข้อความ
-- **[NEW]** รองรับการแสดง thumbnail ก่อนส่งและในข้อความ
-- **[NEW]** สามารถคลิกดูรูปเต็มใน modal dialog
-- **[NEW]** ช่องพิมพ์ข้อความปรับขนาดอัตโนมัติตามเนื้อหา ไม่เกิน 50% ของหน้าจอ
-- **ระบบ AI Web Agent พร้อมใช้งานเต็มรูปแบบแล้ว รวมถึง UI/UX ที่สมบูรณ์**
+- Tab และ Window Management ทำงานได้ถูกต้อง
+- **ระบบ AI Web Agent พร้อมใช้งานเต็มรูปแบบแล้ว รวมถึง Tab Management ที่ปรับปรุงแล้ว**
+
+### บทเรียนสำคัญจากการ Rollback:
+**การจัดการ Version Control:**
+- ต้องทดสอบ TypeScript compilation ให้สมบูรณ์ก่อน commit
+- ต้องทดสอบฟีเจอร์ให้ครบถ้วนก่อนการ deploy
+- Lovable's rollback system ทำงานได้ดีและช่วยในการ recovery
+- **การ rollback ต้องทำผ่าน UI ไม่สามารถทำผ่านโค้ดได้**
+
+**การแก้ไข TypeScript Errors:**
+- ต้องตรวจสอบ type definitions อย่างละเอียด
+- การ destructure จาก hooks ต้องตรวจสอบ property ที่มีอยู่จริง
+- ใช้ authData แทน user property เมื่อทำงานกับ useAuth hook
+
+**Tab และ Window Management:**
+- คำสั่ง open_url ต้องใช้ stored tab ID แทนการเปิดใหม่
+- ต้องแสดง Window ID ใน debug information เพื่อช่วยในการ debug
+- Tab management ต้องทำงานกับ Chrome Extension APIs อย่างถูกต้อง
+
+### Template การแก้ไข TypeScript Error:
+```javascript
+// แทนที่จะใช้ { user } จาก useAuth
+const { isAuthenticated, authData, isLoading, error, login, logout, clearError } = useAuth();
+
+// ใช้ authData แทน user
+const currentUser = authData?.room || 'Unknown';
+```
+
+### Template การแสดง Debug Information:
+```javascript
+// เพิ่ม Window ID ใน debug panel
+const debugInfo = {
+  connection: isConnected ? 'Connected' : 'Disconnected',
+  tabId: tabId || 'Not available',
+  windowId: windowId || 'Not available', // เพิ่มบรรทัดนี้
+  room: authData?.room || 'Not set',
+  messages: messageCount,
+  token: authData?.token ? 'Present' : 'Missing',
+  extension: isExtensionAvailable ? 'Available' : 'Not available'
+};
+```
 
 Technical Architecture:
 -----------------------
@@ -496,10 +291,12 @@ Technical Architecture:
 - Content Script รันบนหน้าเว็บเป้าหมาย
 - Background Script เป็นตัวกลางประมวลผลคำสั่ง
 - **[WORKING]** JSON-based command protocol สำหรับการสั่งงาน
+- **[WORKING]** Tab และ Window Management System
 - **[WORKING]** File handling system with drag and drop support
 - **[WORKING]** Image display system with thumbnail และ full view modal
 - **[WORKING]** Radix UI Dialog integration สำหรับ accessibility
-- **[NEW]** Auto-resizing textarea system สำหรับ responsive input
+- **[WORKING]** Auto-resizing textarea system สำหรับ responsive input
+- **[STABLE]** TypeScript compilation และ error handling
 
 หมายเหตุ:
 --------
@@ -507,11 +304,12 @@ Technical Architecture:
 - จะมีการบันทึกวันที่และเวลาของการอัปเดต
 - ChatPage.tsx มีขนาด 860+ บรรทัด **ควรพิจารณา refactor เร่งด่วน**
 - **สำคัญ: การตรวจสอบ JSON command ใน useEffect ต้องทำอย่างถูกต้องตาม template ข้างต้น**
-- **สำคัญ: การเพิ่ม drag and drop ต้องใช้ dragCounter เพื่อจัดการ nested events**
-- **สำคัญ: การแสดงรูปภาพต้องใช้ object-cover สำหรับ thumbnail และ Radix UI Dialog สำหรับ modal**
-- **สำคัญ: ใช้ base64 content สำหรับการแสดงรูปใน modal แทนการใช้ URL**
-- **สำคัญ: Auto-resizing textarea ต้องใช้ ref และคำนวณ scrollHeight กับ maxHeight อย่างถูกต้อง**
-- **ระบบพร้อมใช้งานครบถ้วนแล้ว รวมถึงฟีเจอร์ auto-resizing textarea**
+- **สำคัญ: การใช้ useAuth hook ต้องใช้ authData แทน user property**
+- **สำคัญ: คำสั่ง open_url ต้องใช้ stored tab/window ID แทนการเปิด tab ใหม่**
+- **สำคัญ: ต้องแสดง Window ID ใน debug panel เพื่อช่วยในการ debug**
+- **สำคัญ: การ rollback ต้องทำผ่าง Lovable UI ไม่สามารถทำผ่านโค้ดได้**
+- **ระบบพร้อมใช้งานครบถ้วนแล้ว รวมถึง Tab Management ที่ปรับปรุงแล้ว**
 - **ChatPage.tsx ขนาดใหญ่มากเกินไป (860+ บรรทัด) ต้อง refactor เป็นไฟล์เล็กๆ หลายไฟล์ทันที**
 
-**สรุป: ระบบ AI Web Agent ทำงานได้สมบูรณ์แบบ พร้อมใช้งานจริง มี UI/UX ที่ดี รองรับทั้ง desktop และ mobile**
+**สรุป: ระบบ AI Web Agent ทำงานได้สมบูรณ์แบบ พร้อมใช้งานจริง มี Tab Management ที่แข็งแกร่ง และ UI/UX ที่ดี รองรับทั้ง desktop และ mobile**
+
