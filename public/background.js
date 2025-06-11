@@ -490,15 +490,31 @@ async function handleOpenUrlCommand(command, originalCommand = null) {
       // เปิดใน tab ปัจจุบัน (side panel tab ถ้ามี)
       const targetTabId = sidePanelTabId;
       if (targetTabId && sidePanelWindowId) {
-        await chrome.tabs.update(targetTabId, { url });
-        result = { 
-          success: true, 
-          action: 'open_url', 
-          url,
-          opened: 'current_tab',
-          tabId: targetTabId,
-          message: `เปิด URL ใน tab ปัจจุบัน: ${url}`
-        };
+        try {
+          await chrome.tabs.update(targetTabId, { url });
+          console.log("[BACKGROUND] ✅ updated tab successfully");
+          result = { 
+            success: true, 
+            action: 'open_url', 
+            url,
+            opened: 'current_tab',
+            tabId: targetTabId,
+            message: `เปิด URL ใน tab ปัจจุบัน: ${url}`
+          };
+        } catch (err) {
+          console.error("[BACKGROUND] ❌ failed to update tab:", err);
+          // ถ้า update tab ไม่ได้ ให้เปิดใน tab ใหม่แทน
+          const newTab = await chrome.tabs.create({ url });
+          result = { 
+            success: true, 
+            action: 'open_url', 
+            url,
+            opened: 'new_tab_fallback',
+            tabId: newTab.id,
+            message: `เปิด URL ใน tab ใหม่ (fallback): ${url}`,
+            originalError: err.message
+          };
+        }
       } else {
         // ถ้าไม่มี side panel tab ให้เปิดใน tab ใหม่
         const newTab = await chrome.tabs.create({ url });
