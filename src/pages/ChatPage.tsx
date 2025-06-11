@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Settings, Bug, X, RefreshCw } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -13,19 +12,19 @@ import { debug_mode } from '../config/env';
 import { useAuth } from '../hooks/useAuth';
 
 const ChatPage: React.FC = () => {
-  const { isAuthenticated, authData, logout } = useAuth();
+  const { user, authData, logout } = useAuth();
   const { 
     isConnected, 
     messages, 
     error, 
     tabId, 
-    windowId,
+    windowId, // เพิ่ม windowId
     room, 
     sendMessage, 
     sendResponse, 
     retry, 
     clearError 
-  } = useWebSocket(isAuthenticated ? 'authenticated_user' : 'guest', authData);
+  } = useWebSocket(user || 'guest', authData);
   
   const [inputMessage, setInputMessage] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
