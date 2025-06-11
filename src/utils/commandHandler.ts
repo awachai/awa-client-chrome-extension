@@ -528,7 +528,7 @@ export class CommandHandler {
     return { success: true, action: 'fill_form', results };
   }
 
-  private async openUrl(url: string, newTab: boolean = true) {
+  private async openUrl(url: string, newTab: boolean = false) {
     try {
       if (!url) {
         return { success: false, error: 'URL is required' };
@@ -541,35 +541,27 @@ export class CommandHandler {
         return { success: false, error: 'Invalid URL format' };
       }
 
-      // ถ้าเป็น Chrome Extension context ให้ใช้ chrome.tabs API
+      // ใช้ Chrome Extension API เพื่อ redirect ไปที่ tab ที่จดจำไว้
       if (typeof chrome !== 'undefined' && chrome.tabs) {
         try {
-          if (newTab) {
-            // เปิดใน tab ใหม่
-            await chrome.tabs.create({ url });
-            return { 
-              success: true, 
-              action: 'open_url', 
-              url,
-              opened: 'new_tab',
-              message: `เปิด URL ใน tab ใหม่: ${url}`
-            };
+          // ส่งคำสั่งไปยัง background script เพื่อใช้ stored tab/window ID
+          const response = await new Promise((resolve) => {
+            chrome.runtime.sendMessage({
+              type: 'EXECUTE_DOM_COMMAND',
+              command: {
+                action: 'open_url',
+                data: { url, newTab }
+              }
+            }, resolve);
+          });
+
+          if (response && response.success) {
+            return response;
           } else {
-            // เปิดใน tab ปัจจุบัน
-            const [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            if (currentTab && currentTab.id) {
-              await chrome.tabs.update(currentTab.id, { url });
-              return { 
-                success: true, 
-                action: 'open_url', 
-                url,
-                opened: 'current_tab',
-                message: `เปิด URL ใน tab ปัจจุบัน: ${url}`
-              };
-            }
+            console.warn('Background script failed to handle open_url, falling back');
           }
         } catch (chromeError) {
-          console.warn('Chrome tabs API failed, falling back to window.open:', chromeError);
+          console.warn('Chrome extension API failed, falling back to window.open:', chromeError);
         }
       }
 
