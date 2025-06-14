@@ -459,6 +459,14 @@ const ChatPage = () => {
       room: authData?.room || null,
       token: authData?.token || null
     };
+
+    if (typeof chrome !== 'undefined' && chrome.runtime && tabId) {
+      chrome.runtime.sendMessage({
+        type: 'USER_INPUT',
+        tabId,
+        windowId: window?.chrome?.windows ? undefined : undefined // ถ้ามี windowId ให้ใส่, ถ้าไม่มีปล่อยว่าง
+      });
+    }
     
     const sent = sendMessage(wsMessage);
     

@@ -99,8 +99,18 @@ async function executeCommandOnTargetTab(command, requestSidePanelTabId = null, 
     }
 
     // ใช้ tab ID และ window ID ที่ส่งมาจาก request ก่อน
-    const targetTabId = requestSidePanelTabId || sidePanelTabId;
-    const targetWindowId = requestSidePanelWindowId || sidePanelWindowId;
+    let targetTabId = requestSidePanelTabId || sidePanelTabId;
+    let targetWindowId = requestSidePanelWindowId || sidePanelWindowId;
+
+    // Fallback: ถ้าไม่มีหรือไม่ตรง ให้หา active tab ปัจจุบัน
+    if (!targetTabId || !targetWindowId) {
+      const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      if (activeTab && activeTab.id && activeTab.windowId) {
+        targetTabId = activeTab.id;
+        targetWindowId = activeTab.windowId;
+        logToContent(targetTabId, '[FALLBACK] Using active tab as target');
+      }
+    }
     
     logToContent(targetTabId, '=== EXECUTE COMMAND DEBUG ===');
     logToContent(targetTabId, `Command: ${JSON.stringify(command)}`);
@@ -428,146 +438,39 @@ async function handleOpenUrlCommand(command, originalCommand = null) {
     const newTab = command.data?.newTab !== false; // default to true
 
     if (!url) {
-      const errorResponse = { success: false, error: 'URL is required' };
-      
-      if (originalCommand) {
-        sendWebSocketResponse({
-          tranType: 'response',
-          type: originalCommand.type,
-          action: originalCommand.action,
-          message: errorResponse.error,
-          selector: originalCommand.selector || '',
-          data: { error: errorResponse.error },
-          tab_id: 'background',
-          window_id: 'background',
-          room: originalCommand.room,
-          timestamp: new Date().toISOString()
-        });
-      }
-      
-      return errorResponse;
+      // ...error handling...
+      return { success: false, error: 'URL is required' };
     }
 
-    // Validate URL format
-    try {
-      new URL(url);
-    } catch (error) {
-      const errorResponse = { success: false, error: 'Invalid URL format' };
-      
-      if (originalCommand) {
-        sendWebSocketResponse({
-          tranType: 'response',
-          type: originalCommand.type,
-          action: originalCommand.action,
-          message: errorResponse.error,
-          selector: originalCommand.selector || '',
-          data: { error: errorResponse.error },
-          tab_id: 'background',
-          window_id: 'background',
-          room: originalCommand.room,
-          timestamp: new Date().toISOString()
-        });
-      }
-      
-      return errorResponse;
-    }
-
-    console.log(`[BACKGROUND] Opening URL: ${url} (newTab: ${newTab})`);
-
-    let result;
-    if (newTab) {
-      // เปิดใน tab ใหม่
-      const newTab = await chrome.tabs.create({ url });
-      result = { 
-        success: true, 
-        action: 'open_url', 
-        url,
-        opened: 'new_tab',
-        tabId: newTab.id,
-        message: `เปิด URL ใน tab ใหม่: ${url}`
-      };
-    } else {
-      // เปิดใน tab ปัจจุบัน (side panel tab ถ้ามี)
-      const targetTabId = sidePanelTabId;
-      if (targetTabId && sidePanelWindowId) {
-        try {
-          await chrome.tabs.update(targetTabId, { url });
-          console.log("[BACKGROUND] ✅ updated tab successfully");
-          result = { 
-            success: true, 
-            action: 'open_url', 
-            url,
-            opened: 'current_tab',
-            tabId: targetTabId,
-            message: `เปิด URL ใน tab ปัจจุบัน: ${url}`
-          };
-        } catch (err) {
-          console.error("[BACKGROUND] ❌ failed to update tab:", err);
-          // ถ้า update tab ไม่ได้ ให้เปิดใน tab ใหม่แทน
-          const newTab = await chrome.tabs.create({ url });
-          result = { 
-            success: true, 
-            action: 'open_url', 
-            url,
-            opened: 'new_tab_fallback',
-            tabId: newTab.id,
-            message: `เปิด URL ใน tab ใหม่ (fallback): ${url}`,
-            originalError: err.message
-          };
-        }
-      } else {
-        // ถ้าไม่มี side panel tab ให้เปิดใน tab ใหม่
-        const newTab = await chrome.tabs.create({ url });
-        result = { 
-          success: true, 
-          action: 'open_url', 
+    // ใช้ tab เดิมถ้ามี (sidePanelTabId/sidePanelWindowId)
+    if (!newTab && sidePanelTabId && sidePanelWindowId) {
+      try {
+        await chrome.tabs.update(sidePanelTabId, { url });
+        return {
+          success: true,
+          action: 'open_url',
           url,
-          opened: 'new_tab',
-          tabId: newTab.id,
-          message: `เปิด URL ใน tab ใหม่: ${url}`
+          opened: 'current_tab',
+          tabId: sidePanelTabId,
+          message: `เปิด URL ใน tab ปัจจุบัน: ${url}`
         };
+      } catch (err) {
+        // ถ้า update ไม่ได้ fallback ไปเปิด tab ใหม่
       }
     }
 
-    console.log(`[BACKGROUND] ✓ URL opened successfully:`, result);
-
-    // ส่ง WebSocket response สำหรับ success
-    if (originalCommand) {
-      sendWebSocketResponse({
-        tranType: 'response',
-        type: originalCommand.type,
-        action: originalCommand.action,
-        message: result.message,
-        selector: originalCommand.selector || '',
-        data: result,
-        tab_id: result.tabId || 'background',
-        window_id: sidePanelWindowId || 'background',
-        room: originalCommand.room,
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    return result;
+    // ถ้า newTab หรือไม่มี tab เดิม ให้เปิด tab ใหม่
+    const newTabObj = await chrome.tabs.create({ url });
+    return {
+      success: true,
+      action: 'open_url',
+      url,
+      opened: 'new_tab',
+      tabId: newTabObj.id,
+      message: `เปิด URL ใน tab ใหม่: ${url}`
+    };
   } catch (error) {
-    console.error('[BACKGROUND] ✗ Failed to open URL:', error);
-    const errorResponse = { success: false, error: `Failed to open URL: ${error.message}` };
-    
-    if (originalCommand) {
-      sendWebSocketResponse({
-        tranType: 'response',
-        type: originalCommand.type,
-        action: originalCommand.action,
-        message: errorResponse.error,
-        selector: originalCommand.selector || '',
-        data: { error: errorResponse.error },
-        tab_id: 'background',
-        window_id: 'background',
-        room: originalCommand.room,
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-    return errorResponse;
+    return { success: false, error: `Failed to open URL: ${error.message}` };
   }
 }
 
@@ -576,6 +479,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('[BACKGROUND] Background received message:', message.type, message);
   console.log('[BACKGROUND] Sender tab info:', sender.tab ? `Tab ID: ${sender.tab.id}, Window ID: ${sender.tab.windowId}, URL: ${sender.tab.url}` : 'No tab info');
   
+  if (message.type === 'USER_INPUT') {
+    const tabId = message.tabId || (sender.tab ? sender.tab.id : null);
+    const windowId = message.windowId || (sender.tab ? sender.tab.windowId : null);
+    if (tabId) {
+      sidePanelTabId = tabId;
+      sidePanelWindowId = windowId;
+      console.log(`[BACKGROUND] USER_INPUT: Set sidePanelTabId=${tabId}, sidePanelWindowId=${windowId}`);
+    }
+    sendResponse({ success: true });
+    return;
+  }
+
   // Content script ready signal
   if (message.type === 'CONTENT_SCRIPT_READY') {
     if (sender.tab) {
@@ -592,13 +507,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   // Side panel opened signal
   if (message.type === 'SIDE_PANEL_OPENED') {
-    // ใช้ tab ID และ window ID ที่ส่งมาจาก message หรือ sender tab
-    const tabId = message.tabId || (sender.tab ? sender.tab.id : null);
-    const windowId = message.windowId || (sender.tab ? sender.tab.windowId : null);
-    
-    if (tabId && windowId) {
-      setSidePanelTab(tabId, windowId);
-    }
     sendResponse({ success: true });
     return;
   }

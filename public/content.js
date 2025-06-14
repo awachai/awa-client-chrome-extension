@@ -1,6 +1,6 @@
 // Content Script - ทำงานบนหน้าเว็บจริง
 (function() {
-  'use strict';
+  'use strict'; 
   
   console.log('AI Web Agent Content Script loading on:', window.location.href);
   console.log('[AUTH_LOG] Content script initializing...');
