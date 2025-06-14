@@ -3,10 +3,11 @@ import { toast } from "@/hooks/use-toast";
 
 export interface BaseCommand {
   tranType: 'request' | 'response';
-  type: 'text' | 'image' | 'connection' | string;
+  type: string;
   action: string;
   message?: string;
   data?: any;
+  [key: string]: any; // Allow additional properties
 }
 
 export interface TextCommand extends BaseCommand {
@@ -23,7 +24,7 @@ export interface ImageCommand extends BaseCommand {
   message: string; // URL or base64
 }
 
-export type WebSocketCommand = TextCommand | ImageCommand;
+export type WebSocketCommand = BaseCommand; // Allow any command structure
 
 export class CommandHandler {
   private onTextMessage?: (message: string) => void;
@@ -42,11 +43,11 @@ export class CommandHandler {
 
     switch (command.type) {
       case 'text':
-        this.handleTextCommand(command);
+        this.handleTextCommand(command as TextCommand);
         break;
       
       case 'image':
-        this.handleImageCommand(command);
+        this.handleImageCommand(command as ImageCommand);
         break;
       
       default:

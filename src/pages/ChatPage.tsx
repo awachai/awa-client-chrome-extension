@@ -245,22 +245,7 @@ const ChatPage = () => {
         imageUrl
       };
       setMessages(prev => [...prev, imageMessage]);
-    },
-    onConfirmRequest: async (message: string) => {
-      return window.confirm(message);
-    },
-    onDebugMessage: (message: string) => {
-      if (message) {
-        const debugMessage: Message = {
-          id: `debug-${Date.now()}`,
-          type: 'debug',
-          content: message,
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, debugMessage]);
-      }
-    },
-    sendWebSocketMessage: sendMessage
+    }
   });
 
   React.useEffect(() => {
@@ -272,130 +257,12 @@ const ChatPage = () => {
         sendConsoleLog(`📨 New WebSocket message: ${JSON.stringify(latestMessage)}`);
       }
       
-      // ตรวจสอบว่าเป็น JSON command structure หรือไม่ - แก้ไขให้ตรวจสอบ tranType ด้วย
-      if (latestMessage.tranType === 'request' && latestMessage.type === 'command' && latestMessage.action) {
-        sendConsoleLog('🎯 DETECTED JSON COMMAND - Processing...', 'info');
-        
-        // แสดง debug message
-        if (debugMode) {
-          const debugMessage: Message = {
-            id: `debug-${Date.now()}`,
-            type: 'debug',
-            content: `🎯 Processing command: ${latestMessage.action} on ${latestMessage.selector || 'no selector'}`,
-            timestamp: new Date()
-          };
-          setMessages(prev => [...prev, debugMessage]);
-        }
-        
-        // ส่งคำสั่งไปยัง Chrome Extension
-        if (typeof chrome !== 'undefined' && chrome.runtime) {
-          const commandPayload = {
-            type: 'EXECUTE_DOM_COMMAND',
-            command: latestMessage,
-            sidePanelTabId: tabId,
-            originalCommand: latestMessage
-          };
-          
-          sendConsoleLog(`📤 Sending command to Chrome Extension: ${latestMessage.action}`, 'info');
-          
-          chrome.runtime.sendMessage(commandPayload, (response) => {
-            if (chrome.runtime.lastError) {
-              sendConsoleLog(`❌ Chrome extension error: ${chrome.runtime.lastError.message}`, 'error');
-              
-              // ส่ง error response กลับ
-              const errorResponse = {
-                tranType: 'response',
-                type: 'command',
-                action: latestMessage.action,
-                message: `error: ${chrome.runtime.lastError.message}`,
-                selector: latestMessage.selector || '',
-                tab_id: tabId,
-                room: room,
-                timestamp: new Date().toISOString()
-              };
-              
-              sendMessage(errorResponse);
-              
-              if (debugMode) {
-                const debugMessage: Message = {
-                  id: `debug-${Date.now()}`,
-                  type: 'debug',
-                  content: `❌ Command failed: ${chrome.runtime.lastError.message}`,
-                  timestamp: new Date()
-                };
-                setMessages(prev => [...prev, debugMessage]);
-              }
-            } else {
-              sendConsoleLog(`✅ Command executed successfully: ${JSON.stringify(response)}`, 'info');
-              
-              // ตรวจสอบ response และสร้าง message ที่เหมาะสม
-              const isSuccess = response && (response.success === true || response.message === 'success');
-              const responseMessage = isSuccess ? 'success' : (response?.error || response?.message || 'unknown error');
-              
-              // ส่ง success response กลับ
-              const successResponse = {
-                tranType: 'response',
-                type: 'command',
-                action: latestMessage.action,
-                message: responseMessage,
-                selector: latestMessage.selector || '',
-                tab_id: tabId,
-                room: room,
-                timestamp: new Date().toISOString()
-              };
-              
-              sendMessage(successResponse);
-              
-              if (debugMode) {
-                const debugMessage: Message = {
-                  id: `debug-${Date.now()}`,
-                  type: 'debug',
-                  content: `✅ Command completed: ${responseMessage}`,
-                  timestamp: new Date()
-                };
-                setMessages(prev => [...prev, debugMessage]);
-              }
-            }
-          });
-        } else {
-          sendConsoleLog('⚠️ Chrome extension not available, using fallback', 'warn');
-          
-          // Fallback ไปใช้ CommandHandler แบบเดิม
-          commandHandler.executeCommand(latestMessage).then(result => {
-            if (result) {
-              const response = {
-                tranType: 'response',
-                type: 'command',
-                action: latestMessage.action,
-                message: result.message || 'completed',
-                selector: latestMessage.selector || '',
-                tab_id: tabId,
-                room: room,
-                timestamp: new Date().toISOString()
-              };
-              
-              sendMessage(response);
-              
-              if (debugMode) {
-                const debugMessage: Message = {
-                  id: `debug-${Date.now()}`,
-                  type: 'debug',
-                  content: `Fallback command completed: ${response.message}`,
-                  timestamp: new Date()
-                };
-                setMessages(prev => [...prev, debugMessage]);
-              }
-            }
-          });
-        }
-      } else {
-        // สำหรับข้อความทั่วไปที่ไม่ใช่ command
-        if (latestMessage.tranType === 'request' && latestMessage.type !== 'command') {
-          commandHandler.executeCommand(latestMessage);
-        } else if (!latestMessage.tranType) {
-          // ข้อความแบบเก่าที่ไม่มี tranType structure
-          commandHandler.executeCommand(latestMessage);
-        }
+      // สำหรับข้อความทั่วไป - เซิร์ฟเวอร์จะจัดการ command processing
+      if (latestMessage.tranType === 'request' && (latestMessage.type === 'text' || latestMessage.type === 'image')) {
+        commandHandler.executeCommand(latestMessage);
+      } else if (!latestMessage.tranType) {
+        // ข้อความแบบเก่าที่ไม่มี tranType structure
+        commandHandler.executeCommand(latestMessage);
       }
     }
   }, [wsMessages, debugMode, tabId, room, sendMessage]);
