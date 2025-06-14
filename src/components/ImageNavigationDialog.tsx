@@ -27,6 +27,7 @@ interface ImageNavigationDialogProps {
   messages: Message[];
   currentMessageId: string;
   currentAttachmentIndex?: number;
+  onNavigateToImage: (messageId: string, attachmentIndex?: number) => void;
 }
 
 export const ImageNavigationDialog: React.FC<ImageNavigationDialogProps> = ({
@@ -36,7 +37,8 @@ export const ImageNavigationDialog: React.FC<ImageNavigationDialogProps> = ({
   currentImageName,
   messages,
   currentMessageId,
-  currentAttachmentIndex
+  currentAttachmentIndex,
+  onNavigateToImage
 }) => {
   // Get all images from messages
   const getAllImages = () => {
@@ -89,18 +91,14 @@ export const ImageNavigationDialog: React.FC<ImageNavigationDialogProps> = ({
   const handlePrevious = () => {
     if (canGoPrevious) {
       const prevImage = allImages[currentIndex - 1];
-      // You would need to update the parent component to handle this navigation
-      // For now, we'll just close and let the parent handle it
-      onClose();
+      onNavigateToImage(prevImage.messageId, prevImage.attachmentIndex);
     }
   };
 
   const handleNext = () => {
     if (canGoNext) {
       const nextImage = allImages[currentIndex + 1];
-      // You would need to update the parent component to handle this navigation
-      // For now, we'll just close and let the parent handle it
-      onClose();
+      onNavigateToImage(nextImage.messageId, nextImage.attachmentIndex);
     }
   };
 

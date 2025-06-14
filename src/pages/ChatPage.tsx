@@ -427,6 +427,36 @@ const ChatPage = () => {
     });
   };
 
+  const handleNavigateToImage = (messageId: string, attachmentIndex?: number) => {
+    // Find the target message and image
+    const targetMessage = messages.find(msg => msg.id === messageId);
+    if (!targetMessage) return;
+
+    let imageUrl = '';
+    let imageName = '';
+
+    if (attachmentIndex !== undefined && targetMessage.attachments) {
+      const attachment = targetMessage.attachments[attachmentIndex];
+      if (attachment && attachment.type === 'image') {
+        imageUrl = attachment.url;
+        imageName = attachment.name;
+      }
+    } else if (targetMessage.imageUrl) {
+      imageUrl = targetMessage.imageUrl;
+      imageName = 'Generated image';
+    }
+
+    if (imageUrl) {
+      setImageDialog({
+        isOpen: true,
+        imageUrl,
+        imageName,
+        messageId,
+        attachmentIndex
+      });
+    }
+  };
+
   return (
     <div 
       className="flex flex-col h-screen bg-gray-50"
@@ -783,6 +813,7 @@ const ChatPage = () => {
         messages={messages}
         currentMessageId={imageDialog.messageId}
         currentAttachmentIndex={imageDialog.attachmentIndex}
+        onNavigateToImage={handleNavigateToImage}
       />
     </div>
   );
