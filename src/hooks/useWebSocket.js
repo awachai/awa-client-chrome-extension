@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getWebSocketUrl } from '../config/env';
 
@@ -6,7 +7,7 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
   const [messages, setMessages] = useState([]);
   const [error, setError] = useState(null);
   const [tabId, setTabId] = useState(null);
-  const [windowId, setWindowId] = useState(null); // เพิ่ม windowId state
+  const [windowId, setWindowId] = useState(null);
   const [room, setRoom] = useState(null);
   const ws = useRef(null);
   const reconnectTimeoutRef = useRef(null);
@@ -97,7 +98,7 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
           action: 'connect',
           message: 'Connected successfully',
           tab_id: currentTabId,
-          window_id: currentWindowId, // เพิ่ม window_id
+          window_id: currentWindowId,
           room: currentRoom,
           data: {
             user: user,
@@ -119,20 +120,10 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
           const data = JSON.parse(event.data);
           console.log('WebSocket message received:', data);
           
-          // ตรวจสอบว่าเป็น command ที่มี tranType หรือไม่
-          if (data.tranType === 'request') {
-            console.log('Received command request:', data);
-            setMessages(prev => [...prev, data]);
-          } else if (data.tranType === 'response') {
-            console.log('Received response from server:', data);
-            setMessages(prev => [...prev, data]);
-          } else {
-            // สำหรับข้อความทั่วไปที่ไม่มี tranType
-            setMessages(prev => [...prev, data]);
-          }
+          // รับข้อความทุกประเภท แต่ไม่ประมวลผล command
+          setMessages(prev => [...prev, data]);
         } catch (err) {
           console.error('Error parsing WebSocket message:', err);
-          // Don't set error for parsing issues, just log them
         }
       };
 
@@ -212,49 +203,6 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
     }
   }, []);
 
-  // ฟังก์ชันสำหรับส่ง response กลับเซิร์ฟเวอร์ พร้อม window_id
-  const sendResponse = useCallback((responseCommand) => {
-    // เพิ่ม tab_id, window_id และ room ใน response
-    const enhancedResponse = {
-      ...responseCommand,
-      tab_id: tabId,
-      window_id: windowId, // เพิ่ม window_id
-      room: room,
-      token: authData?.token || null,
-      timestamp: new Date().toISOString()
-    };
-    
-    console.log('Sending enhanced response to server:', enhancedResponse);
-    const sent = sendMessage(enhancedResponse);
-    
-    // แสดง console log ใน content script ด้วย
-    if (sent) {
-      console.log('✅ Response sent successfully via WebSocket:', enhancedResponse);
-      
-      // ส่ง console log ไปยัง content script ด้วย
-      if (typeof chrome !== 'undefined' && chrome.tabs && tabId && windowId) {
-        try {
-          // ถ้าเป็น Chrome Extension context ให้ส่ง log ไป content script
-          chrome.tabs.sendMessage(parseInt(tabId), {
-            type: 'CONSOLE_LOG',
-            message: `Response sent to server: ${JSON.stringify(enhancedResponse)}`,
-            level: 'info'
-          }, (response) => {
-            if (chrome.runtime.lastError) {
-              console.log('Could not send log to content script:', chrome.runtime.lastError.message);
-            }
-          });
-        } catch (error) {
-          console.log('Error sending log to content script:', error);
-        }
-      }
-    } else {
-      console.error('❌ Failed to send response via WebSocket');
-    }
-    
-    return sent;
-  }, [sendMessage, tabId, windowId, room, authData]);
-
   const clearError = useCallback(() => {
     setError(null);
   }, []);
@@ -279,10 +227,9 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
     messages,
     error,
     tabId,
-    windowId, // export windowId
+    windowId,
     room,
     sendMessage,
-    sendResponse,
     connect,
     disconnect,
     clearError,
