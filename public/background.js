@@ -6,6 +6,22 @@ const readyTabs = new Map();
 // tab ID และ window ID ที่มี side panel เปิดอยู่
 let sidePanelTabId = null;
 let sidePanelWindowId = null; // เพิ่มการจดจำ window ID
+
+// ✅ ฟังก์ชันสำหรับโฟกัสแท็บและวินโดว์ที่ extension ทำงานอยู่
+function focusTargetTab(callback) {
+  if (sidePanelTabId && sidePanelWindowId) {
+    chrome.windows.update(sidePanelWindowId, { focused: true }, () => {
+      chrome.tabs.update(sidePanelTabId, { active: true }, () => {
+        if (callback) callback();
+      });
+    });
+  } else {
+    console.warn('[BACKGROUND] Cannot focus tab: sidePanelTabId or windowId missing');
+    if (callback) callback(); // fallback
+  }
+}
+
+
 // WebSocket connection for sending responses back
 let websocketConnection = null;
 
