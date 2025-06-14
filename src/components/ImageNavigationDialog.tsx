@@ -111,7 +111,7 @@ export const ImageNavigationDialog: React.FC<ImageNavigationDialogProps> = ({
             variant="ghost"
             size="sm"
             onClick={onClose}
-            className="absolute top-4 right-4 z-10 text-white hover:bg-white/20"
+            className="absolute top-4 right-4 z-10 text-white hover:bg-white/20 bg-black/50 backdrop-blur-sm"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -122,7 +122,7 @@ export const ImageNavigationDialog: React.FC<ImageNavigationDialogProps> = ({
               variant="ghost"
               size="sm"
               onClick={handlePrevious}
-              className="absolute left-4 top-1/2 -translate-y-1/2 z-10 text-white hover:bg-white/20"
+              className="absolute left-4 top-1/2 -translate-y-1/2 z-10 text-white hover:bg-white/20 bg-black/50 backdrop-blur-sm"
             >
               <ChevronLeft className="h-6 w-6" />
             </Button>
@@ -133,7 +133,7 @@ export const ImageNavigationDialog: React.FC<ImageNavigationDialogProps> = ({
               variant="ghost"
               size="sm"
               onClick={handleNext}
-              className="absolute right-4 top-1/2 -translate-y-1/2 z-10 text-white hover:bg-white/20"
+              className="absolute right-4 top-1/2 -translate-y-1/2 z-10 text-white hover:bg-white/20 bg-black/50 backdrop-blur-sm"
             >
               <ChevronRight className="h-6 w-6" />
             </Button>
@@ -151,7 +151,7 @@ export const ImageNavigationDialog: React.FC<ImageNavigationDialogProps> = ({
 
           {/* Image info */}
           <div className="absolute bottom-4 left-4 right-4 text-center">
-            <div className="bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+            <div className="bg-black/50 text-white px-3 py-1 rounded-full text-sm backdrop-blur-sm">
               {currentImageName} ({currentIndex + 1} / {allImages.length})
             </div>
           </div>
