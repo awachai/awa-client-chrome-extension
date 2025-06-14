@@ -11,6 +11,7 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import { CommandHandler } from '@/utils/commandHandler';
 import { useAuth } from '@/hooks/useAuth';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { ImageNavigationDialog } from '@/components/ImageNavigationDialog';
 
 interface Message {
   id: string;
@@ -392,6 +393,40 @@ const ChatPage = () => {
     adjustTextareaHeight();
   }, [inputMessage]);
 
+  const [imageDialog, setImageDialog] = React.useState<{
+    isOpen: boolean;
+    imageUrl: string;
+    imageName: string;
+    messageId: string;
+    attachmentIndex?: number;
+  }>({
+    isOpen: false,
+    imageUrl: '',
+    imageName: '',
+    messageId: '',
+    attachmentIndex: undefined
+  });
+
+  const openImageDialog = (imageUrl: string, imageName: string, messageId: string, attachmentIndex?: number) => {
+    setImageDialog({
+      isOpen: true,
+      imageUrl,
+      imageName,
+      messageId,
+      attachmentIndex
+    });
+  };
+
+  const closeImageDialog = () => {
+    setImageDialog({
+      isOpen: false,
+      imageUrl: '',
+      imageName: '',
+      messageId: '',
+      attachmentIndex: undefined
+    });
+  };
+
   return (
     <div 
       className="flex flex-col h-screen bg-gray-50"
@@ -524,62 +559,44 @@ const ChatPage = () => {
                   {message.attachments && message.attachments.length > 0 && (
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
                       {message.attachments.map((attachment, index) => {
-                        // Use attachment.url if available, otherwise create from base64 content
                         const displayUrl = attachment.url || 
                           (attachment.content ? `data:${attachment.fileType || 'image/jpeg'};base64,${attachment.content}` : '');
-                        
-                        console.log('Attachment display URL:', displayUrl.substring(0, 50) + '...');
                         
                         return (
                           <div key={index}>
                             {attachment.type === 'image' ? (
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <div className="relative cursor-pointer group">
-                                    <img 
-                                      src={displayUrl} 
-                                      alt={attachment.name}
-                                      className="w-full h-20 object-cover rounded-lg border group-hover:opacity-80 transition-opacity"
-                                      onError={(e) => {
-                                        console.error('Image load error for attachment:', attachment.name);
-                                        console.error('Display URL:', displayUrl.substring(0, 100));
-                                        // Fallback to file icon if image fails to load
-                                        const target = e.target as HTMLImageElement;
-                                        target.style.display = 'none';
-                                        const parent = target.parentElement;
-                                        if (parent) {
-                                          parent.innerHTML = `
-                                            <div class="w-full h-20 bg-gray-100 border rounded-lg flex items-center justify-center">
-                                              <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                              </svg>
-                                            </div>
-                                          `;
-                                        }
-                                      }}
-                                    />
-                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity rounded-lg flex items-center justify-center">
-                                      <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </div>
-                                  </div>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-4xl max-h-[80vh] p-0">
-                                  <img 
-                                    src={displayUrl} 
-                                    alt={attachment.name}
-                                    className="w-full h-auto max-h-[75vh] object-contain"
-                                    onError={(e) => {
-                                      console.error('Dialog image load error for:', attachment.name);
-                                      console.error('Display URL:', displayUrl.substring(0, 100));
-                                    }}
-                                  />
-                                </DialogContent>
-                              </Dialog>
+                              <div 
+                                className="relative cursor-pointer group"
+                                onClick={() => openImageDialog(displayUrl, attachment.name, message.id, index)}
+                              >
+                                <img 
+                                  src={displayUrl} 
+                                  alt={attachment.name}
+                                  className="w-full h-20 object-cover rounded-lg border group-hover:opacity-80 transition-opacity"
+                                  onError={(e) => {
+                                    console.error('Image load error for attachment:', attachment.name);
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    const parent = target.parentElement;
+                                    if (parent) {
+                                      parent.innerHTML = `
+                                        <div class="w-full h-20 bg-gray-100 border rounded-lg flex items-center justify-center">
+                                          <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                          </svg>
+                                        </div>
+                                      `;
+                                    }
+                                  }}
+                                />
+                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity rounded-lg flex items-center justify-center">
+                                  <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                              </div>
                             ) : (
                               <div 
                                 className="p-3 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
                                 onClick={() => {
-                                  // Create downloadable link for non-image files
                                   if (attachment.content) {
                                     try {
                                       const binaryString = atob(attachment.content);
@@ -636,27 +653,19 @@ const ChatPage = () => {
                   )}
                   
                   {message.imageUrl && (
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <div className="mt-2 cursor-pointer group relative">
-                          <img 
-                            src={message.imageUrl} 
-                            alt="Generated content" 
-                            className="max-w-full h-auto rounded-lg border group-hover:opacity-80 transition-opacity"
-                          />
-                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity rounded-lg flex items-center justify-center">
-                            <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </div>
-                        </div>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-4xl max-h-[80vh] p-0">
-                        <img 
-                          src={message.imageUrl} 
-                          alt="Generated content" 
-                          className="w-full h-auto max-h-[75vh] object-contain"
-                        />
-                      </DialogContent>
-                    </Dialog>
+                    <div 
+                      className="mt-2 cursor-pointer group relative"
+                      onClick={() => openImageDialog(message.imageUrl!, 'Generated content', message.id)}
+                    >
+                      <img 
+                        src={message.imageUrl} 
+                        alt="Generated content" 
+                        className="max-w-full h-auto rounded-lg border group-hover:opacity-80 transition-opacity"
+                      />
+                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity rounded-lg flex items-center justify-center">
+                        <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -764,6 +773,17 @@ const ChatPage = () => {
           )}
         </div>
       </div>
+
+      {/* Image Navigation Dialog */}
+      <ImageNavigationDialog
+        isOpen={imageDialog.isOpen}
+        onClose={closeImageDialog}
+        currentImageUrl={imageDialog.imageUrl}
+        currentImageName={imageDialog.imageName}
+        messages={messages}
+        currentMessageId={imageDialog.messageId}
+        currentAttachmentIndex={imageDialog.attachmentIndex}
+      />
     </div>
   );
 };
