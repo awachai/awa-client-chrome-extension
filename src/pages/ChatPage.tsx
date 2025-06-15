@@ -315,17 +315,13 @@ const ChatPage = () => {
     
     setMessages(prev => [...prev, userMessage]);
     
-    const parseResult = parseJsonFromText(inputMessage);
-    
+    // ใช้โครงสร้างใหม่ในการส่งข้อความ
     const wsMessage = {
       type: 'user_message',
-      content: inputMessage,
+      message: inputMessage,
+      room: authData?.room || room || '',
       attachments,
-      timestamp: new Date().toISOString(),
-      isJsonCommand: parseResult.isJson,
-      jsonData: parseResult.isJson ? parseResult.data : null,
-      room: authData?.room || null,
-      token: authData?.token || null
+      timestamp: new Date().toISOString()
     };
 
     if (typeof chrome !== 'undefined' && chrome.runtime && tabId) {

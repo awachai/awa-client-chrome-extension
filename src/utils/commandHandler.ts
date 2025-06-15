@@ -1,30 +1,18 @@
 
 import { toast } from "@/hooks/use-toast";
 
-export interface BaseCommand {
-  tranType: 'request' | 'response';
+// โครงสร้างข้อความใหม่ที่ง่ายขึ้น
+export interface WebSocketMessage {
   type: string;
-  action: string;
-  message?: string;
-  data?: any;
-  [key: string]: any; // Allow additional properties
-}
-
-export interface TextCommand extends BaseCommand {
-  tranType: 'request';
-  type: 'text';
-  action: 'say';
   message: string;
+  room: string;
+  attachments: Array<{
+    type: 'image' | 'file';
+    content: string; // base64
+    name: string;
+  }>;
+  timestamp: string;
 }
-
-export interface ImageCommand extends BaseCommand {
-  tranType: 'request';
-  type: 'image';
-  action: 'show_image';
-  message: string; // URL or base64
-}
-
-export type WebSocketCommand = BaseCommand; // Allow any command structure
 
 export class CommandHandler {
   private onTextMessage?: (message: string) => void;
@@ -38,35 +26,22 @@ export class CommandHandler {
     this.onImageReceived = callbacks.onImageReceived;
   }
 
-  async executeCommand(command: WebSocketCommand): Promise<void> {
+  async executeCommand(command: WebSocketMessage): Promise<void> {
     console.log('Processing message:', command);
 
-    switch (command.type) {
-      case 'text':
-        this.handleTextCommand(command as TextCommand);
-        break;
-      
-      case 'image':
-        this.handleImageCommand(command as ImageCommand);
-        break;
-      
-      default:
-        console.log('Unknown message type:', command.type);
-        break;
+    // ตรวจสอบว่าเป็นข้อความที่มีรูปภาพหรือไม่
+    if (command.attachments && command.attachments.length > 0) {
+      // ถ้ามีรูปภาพในแนบไฟล์
+      const imageAttachment = command.attachments.find(att => att.type === 'image');
+      if (imageAttachment && this.onImageReceived) {
+        const imageUrl = `data:image/jpeg;base64,${imageAttachment.content}`;
+        this.onImageReceived(imageUrl);
+      }
     }
-  }
 
-  private handleTextCommand(command: TextCommand) {
-    console.log('AI says:', command.message);
-    if (this.onTextMessage) {
+    // แสดงข้อความหลัก
+    if (command.message && this.onTextMessage) {
       this.onTextMessage(command.message);
-    }
-  }
-
-  private handleImageCommand(command: ImageCommand) {
-    console.log('Showing image:', command.message);
-    if (this.onImageReceived) {
-      this.onImageReceived(command.message);
     }
   }
 }

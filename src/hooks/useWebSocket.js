@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getWebSocketUrl } from '../config/env';
 
@@ -91,22 +90,13 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
         reconnectAttempts.current = 0;
         isConnecting.current = false;
 
-        // Send initial connection info with window ID
+        // Send initial connection info with new structure
         const connectionInfo = {
-          tranType: 'auth',
           type: 'connection',
-          action: 'connect',
           message: 'Connected successfully',
-          tab_id: currentTabId,
-          window_id: currentWindowId,
           room: currentRoom,
-          data: {
-            user: user,
-            timestamp: new Date().toISOString(),
-            userAgent: navigator.userAgent,
-            authenticated: !!authData,
-            hasToken: !!authData?.token
-          }
+          attachments: [],
+          timestamp: new Date().toISOString()
         };
         
         if (ws.current && ws.current.readyState === WebSocket.OPEN) {
@@ -120,7 +110,7 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
           const data = JSON.parse(event.data);
           console.log('WebSocket message received:', data);
           
-          // รับข้อความทุกประเภท แต่ไม่ประมวลผล command
+          // รับข้อความทุกประเภท
           setMessages(prev => [...prev, data]);
         } catch (err) {
           console.error('Error parsing WebSocket message:', err);
