@@ -44,9 +44,20 @@ const ChatPage = () => {
   const [filePreviewUrls, setFilePreviewUrls] = React.useState<{[key: string]: string}>({});
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { authData, logout } = useAuth();
   const isMobile = useIsMobile();
+
+  // Auto-scroll to bottom function
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Auto-scroll when messages change
+  React.useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   // Helper function to send console logs to content script
   const sendConsoleLog = (message: string, level: 'log' | 'info' | 'warn' | 'error' = 'log') => {
@@ -698,6 +709,8 @@ const ChatPage = () => {
               </div>
             </Card>
           ))}
+          {/* Invisible div for auto-scroll reference */}
+          <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
 
