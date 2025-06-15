@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getWebSocketUrl } from '../config/env';
 
@@ -90,13 +91,14 @@ export const useWebSocket = (user = 'nueng', authData = null) => {
         reconnectAttempts.current = 0;
         isConnecting.current = false;
 
-        // Send initial connection info with new structure
+        // Send initial connection info with new structure including http_tunnel
         const connectionInfo = {
           type: 'connection',
           message: 'Connected successfully',
           room: currentRoom,
           attachments: [],
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          http_tunnel: authData?.http_tunnel || ""
         };
         
         if (ws.current && ws.current.readyState === WebSocket.OPEN) {

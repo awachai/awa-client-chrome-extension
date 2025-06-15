@@ -12,6 +12,7 @@ export interface WebSocketMessage {
     name: string;
   }>;
   timestamp: string;
+  http_tunnel: string;
 }
 
 export class CommandHandler {

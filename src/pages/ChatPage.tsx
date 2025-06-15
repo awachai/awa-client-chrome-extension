@@ -315,13 +315,14 @@ const ChatPage = () => {
     
     setMessages(prev => [...prev, userMessage]);
     
-    // ใช้โครงสร้างใหม่ในการส่งข้อความ
+    // ใช้โครงสร้างใหม่ในการส่งข้อความ พร้อม http_tunnel
     const wsMessage = {
       type: 'user_message',
       message: inputMessage,
       room: authData?.room || room || '',
       attachments,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      http_tunnel: authData?.http_tunnel || ""
     };
 
     if (typeof chrome !== 'undefined' && chrome.runtime && tabId) {
