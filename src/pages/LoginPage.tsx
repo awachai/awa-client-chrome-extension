@@ -5,13 +5,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
-import { Bot, User, Lock } from "lucide-react";
+import { Bot, User, Lock, Globe } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 
 const LoginPage = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [httpTunnel, setHttpTunnel] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
   const { login, isLoading, error, clearError } = useAuth();
@@ -35,7 +36,11 @@ const LoginPage = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     logToContent('Form submitted');
-    logToContent(`Credentials: ${JSON.stringify({ username, password: password ? '***' : 'empty' })}`);
+    logToContent(`Credentials: ${JSON.stringify({ 
+      username, 
+      password: password ? '***' : 'empty',
+      http_tunnel: httpTunnel
+    })}`);
     
     clearError();
 
@@ -51,7 +56,7 @@ const LoginPage = () => {
 
     logToContent('Calling login function...');
     try {
-      const result = await login({ username, password });
+      const result = await login({ username, password, http_tunnel: httpTunnel });
       logToContent(`Login result: ${JSON.stringify(result)}`);
 
       if (result.success) {
@@ -124,6 +129,23 @@ const LoginPage = () => {
                   }}
                   className="pl-10"
                   required
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="httpTunnel">HTTP Tunnel (ไม่บังคับ)</Label>
+              <div className="relative">
+                <Globe className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  id="httpTunnel"
+                  type="text"
+                  placeholder="http://example.com"
+                  value={httpTunnel}
+                  onChange={(e) => {
+                    logToContent(`HTTP Tunnel changed: ${e.target.value}`);
+                    setHttpTunnel(e.target.value);
+                  }}
+                  className="pl-10"
                 />
               </div>
             </div>

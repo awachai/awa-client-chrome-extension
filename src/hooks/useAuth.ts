@@ -10,6 +10,7 @@ interface AuthData {
 interface LoginCredentials {
   username: string;
   password: string;
+  http_tunnel?: string;
 }
 
 export const useAuth = () => {
@@ -54,7 +55,11 @@ export const useAuth = () => {
   }, []);
 
   const login = async (credentials: LoginCredentials): Promise<{ success: boolean; error?: string }> => {
-    logToContent(`Login function called with: ${JSON.stringify({ username: credentials.username, password: credentials.password ? '***' : 'empty' })}`);
+    logToContent(`Login function called with: ${JSON.stringify({ 
+      username: credentials.username, 
+      password: credentials.password ? '***' : 'empty',
+      http_tunnel: credentials.http_tunnel || ''
+    })}`);
     
     setIsLoading(true);
     setError(null);
@@ -72,6 +77,7 @@ export const useAuth = () => {
         body: JSON.stringify({
           username: credentials.username,
           password: credentials.password,
+          http_tunnel: credentials.http_tunnel || "",
         }),
       });
 
