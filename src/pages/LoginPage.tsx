@@ -12,7 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 const LoginPage = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [httpTunnel, setHttpTunnel] = useState("");
+  const [httpTunnel, setHttpTunnel] = useState("http://localhost:9515");
   const navigate = useNavigate();
   const { toast } = useToast();
   const { login, isLoading, error, clearError } = useAuth();
@@ -133,13 +133,13 @@ const LoginPage = () => {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="httpTunnel">HTTP Tunnel (ไม่บังคับ)</Label>
+              <Label htmlFor="httpTunnel">HTTP Tunnel</Label>
               <div className="relative">
                 <Globe className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   id="httpTunnel"
                   type="text"
-                  placeholder="http://example.com"
+                  placeholder="http://localhost:9515"
                   value={httpTunnel}
                   onChange={(e) => {
                     logToContent(`HTTP Tunnel changed: ${e.target.value}`);
