@@ -27,7 +27,8 @@ export class JsonCommandParser {
         message: parsed.message || '',
         room: parsed.room || '',
         attachments: parsed.attachments || [],
-        timestamp: parsed.timestamp || new Date().toISOString()
+        timestamp: parsed.timestamp || new Date().toISOString(),
+        http_tunnel: parsed.http_tunnel || ""
       };
 
       return {
@@ -52,7 +53,8 @@ export class JsonCommandParser {
         message: input,
         room: '',
         attachments: [],
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        http_tunnel: ""
       }
     };
   }

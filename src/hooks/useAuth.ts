@@ -5,6 +5,7 @@ import { API_BASE_URL } from '../config/env';
 interface AuthData {
   token: string;
   room: string;
+  http_tunnel?: string;
 }
 
 interface LoginCredentials {
